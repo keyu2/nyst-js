@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Fragment } from "react";
 import { Metro } from "iconoir-react";
 import { ChevronDown } from "lucide-react";
 import RouteBullet from "../../../components/RouteBullet";
-import { parentStopId } from "../../../lib/tripProgress";
+import { useSubwayPreferences } from "../../../lib/preferences";
+import { parentStopId, selectedStopStatus } from "../../../lib/tripProgress";
 import { hasTransferRouteChange } from "../../../lib/routes";
+import { useLiveTimestamp } from "../../../lib/useLiveTimestamp";
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
@@ -15,12 +19,6 @@ const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
 
 function formatTime(timestamp) {
   return timestamp ? TIME_FORMATTER.format(new Date(Number(timestamp) * 1000)) : "";
-}
-
-function selectedStopStatus(stopsAway) {
-  if (stopsAway === null) return "passed";
-  if (stopsAway === 0) return "arriving now";
-  return `${stopsAway} ${stopsAway === 1 ? "stop" : "stops"} away`;
 }
 
 function TransferRoutes({ routeIds }) {
@@ -47,11 +45,13 @@ function TripStopRow({
   index,
   intermediateStopCount,
   nextStopIndex,
+  now,
   routeId,
   selectedStopIndex,
   stopTime,
   stopTimes,
   stopsAway,
+  tripProgressUnit,
 }) {
   if (!stopTime.stop) return null;
 
@@ -111,7 +111,9 @@ function TripStopRow({
             <div className={isSelected ? "trip-selected-stop-name" : undefined}>
               <span>{stopTime.stop.name}</span>
               {isSelected && (
-                <span className="trip-stops-away">{selectedStopStatus(stopsAway)}</span>
+                <span className="trip-stops-away">
+                  {selectedStopStatus(stopsAway, timestamp, now, tripProgressUnit)}
+                </span>
               )}
             </div>
             {showTransferRoutes && transferRoutes.length > 0 && (
@@ -133,7 +135,9 @@ function TripStopRow({
   );
 }
 
-export default function TripTimeline({ progress, routeId, stopTimes }) {
+export default function TripTimeline({ initialTimestamp, progress, routeId, stopTimes }) {
+  const now = useLiveTimestamp(initialTimestamp);
+  const { tripProgressUnit } = useSubwayPreferences();
   const {
     intermediateStopCount,
     nextStopIndex,
@@ -173,11 +177,13 @@ export default function TripTimeline({ progress, routeId, stopTimes }) {
             intermediateStopCount={intermediateStopCount}
             key={`${stopTime.stop?.id || "stop"}-${index}`}
             nextStopIndex={nextStopIndex}
+            now={now}
             routeId={routeId}
             selectedStopIndex={selectedStopIndex}
             stopTime={stopTime}
             stopTimes={stopTimes}
             stopsAway={stopsAway}
+            tripProgressUnit={tripProgressUnit}
           />
         ))}
       </div>

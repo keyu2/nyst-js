@@ -685,14 +685,57 @@
 .alert-group { margin-top: 24px; }
 .alert-group h2 { margin-bottom: 12px; font-size: 20px; }
 .alert-group__list { display: grid; gap: 12px; }
-.alert-card__summary { padding: 16px 18px; cursor: pointer; line-height: 1.4; }
+.alert-card__summary {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.alert-card__summary::after {
+  flex: 0 0 auto;
+  float: none;
+  font-weight: 800;
+}
+
 .alert-card__type,
 .alert-card__time,
-.alert-card__heading { display: block; }
-.alert-card__type { margin-bottom: 3px; font-size: 14px; font-weight: 700; }
-.alert-card__time { margin-bottom: 8px; font-size: 14px; font-weight: 600; }
-.alert-card__heading { font-size: 17px; font-weight: 700; }
-.alert-card__details { padding: 16px 18px 18px; font-size: 15px; line-height: 1.55; white-space: pre-line; }
+.alert-card__heading {
+  display: block;
+}
+
+.alert-card__type {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.alert-card__time {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.alert-card__heading {
+  margin-bottom: 14px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.alert-card__details {
+  padding: 16px 18px 18px;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.alert-card__description {
+  white-space: pre-line;
+}
 
 .station-route-tabs {
   display: flex;
@@ -840,4 +883,30 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* Route alerts collapse by type while preserving every MTA notice inside. */
+.route-service-alert__label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.route-service-alert__count {
+  flex: 0 0 auto;
+  font-size: .72em;
+  opacity: .8;
+}
+.route-service-alert__details { padding: 0; }
+.route-service-alert__item { padding: 20px 22px; }
+.route-service-alert__item + .route-service-alert__item {
+  border-top: 1px solid var(--line);
+}
+.route-service-alert__item strong {
+  display: block;
+  margin-top: 10px;
+}
+.route-service-alert__description {
+  margin-top: 14px;
+  white-space: pre-line;
 }

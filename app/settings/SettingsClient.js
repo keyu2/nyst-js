@@ -13,6 +13,10 @@ const COUNTDOWN_OPTIONS = [
   { value: "minutes", label: "Minutes" },
   { value: "seconds", label: "Minutes + seconds" },
 ];
+const TRIP_PROGRESS_OPTIONS = [
+  { value: "minutes", label: "Minutes" },
+  { value: "stops", label: "Stops away" },
+];
 const DISPLAY_MODE_OPTIONS = [
   { value: "standard", label: "Standard" },
   { value: "board", label: "Display board" },
@@ -20,6 +24,10 @@ const DISPLAY_MODE_OPTIONS = [
 const ALERT_LAYOUT_OPTIONS = [
   { value: "stacked", label: "Stacked" },
   { value: "columns", label: "Side by side" },
+];
+const ARRIVAL_INVERSION_OPTIONS = [
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
 ];
 const LINE_SELECTION_OPTIONS = [
   { value: "overview", label: "Traditional" },
@@ -54,13 +62,17 @@ function SegmentedSetting({ label, value, options, onChange }) {
 export default function SettingsClient() {
   const {
     showSeconds,
+    tripProgressUnit,
     lineView,
     stationView,
     boardAlertLayout,
+    boardArrivalInversion,
     setShowSeconds,
+    setTripProgressUnit,
     setLineView,
     setStationView,
     setBoardAlertLayout,
+    setBoardArrivalInversion,
   } = useSubwayPreferences();
   const { theme, setTheme } = useThemePreference();
 
@@ -91,6 +103,13 @@ export default function SettingsClient() {
           </div>
 
           <SegmentedSetting
+            label="Trip progress"
+            value={tripProgressUnit}
+            onChange={setTripProgressUnit}
+            options={TRIP_PROGRESS_OPTIONS}
+          />
+
+          <SegmentedSetting
             label="Display mode"
             value={stationView}
             onChange={setStationView}
@@ -98,12 +117,20 @@ export default function SettingsClient() {
           />
 
           {stationView === "board" && (
-            <SegmentedSetting
-              label="Service alerts"
-              value={boardAlertLayout}
-              onChange={setBoardAlertLayout}
-              options={ALERT_LAYOUT_OPTIONS}
-            />
+            <>
+              <SegmentedSetting
+                label="Service alerts"
+                value={boardAlertLayout}
+                onChange={setBoardAlertLayout}
+                options={ALERT_LAYOUT_OPTIONS}
+              />
+              <SegmentedSetting
+                label="0-minute inversion"
+                value={boardArrivalInversion ? "on" : "off"}
+                onChange={(value) => setBoardArrivalInversion(value === "on")}
+                options={ARRIVAL_INVERSION_OPTIONS}
+              />
+            </>
           )}
 
           <SegmentedSetting

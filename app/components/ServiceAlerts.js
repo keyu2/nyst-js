@@ -2,6 +2,7 @@ import Image from "next/image";
 import { TriangleAlert } from "lucide-react";
 import RouteBullet from "./RouteBullet";
 import { serviceAlertLabel, serviceAlertTone } from "../lib/alertClassification";
+import { normalizeRouteId } from "../lib/routes";
 
 const ALERT_ROUTE_IDS = new Set([
   "1", "2", "3", "4", "5", "6", "6X", "7", "7X",
@@ -46,11 +47,12 @@ export function RichAlertText({ text }) {
     if (!bracketed) return part;
     const value = bracketed[1].trim();
     const upper = value.toUpperCase();
-    if (ALERT_ROUTE_IDS.has(upper)) {
+    const routeId = normalizeRouteId(upper);
+    if (ALERT_ROUTE_IDS.has(routeId)) {
       return (
         <RouteBullet
           key={`${part}-${index}`}
-          routeId={upper}
+          routeId={routeId}
           title={`${upper} train`}
           size={21}
           className="rich-alert-inline"
@@ -128,28 +130,28 @@ export function StationServiceAlerts({ alerts }) {
 
 function AlertCard({ alert }) {
   const tone = serviceAlertTone(alert);
+  const label = serviceAlertLabel(alert, "Service Alert");
+
   return (
     <details className={`alert-card alert-card--${tone}`}>
       <summary className="alert-card__summary">
-        {alert.alertType && (
-          <span className="alert-card__type">
-            {alert.alertType}
-          </span>
-        )}
-        {alert.timeLabel && (
-          <span className="alert-card__time">
-            {alert.timeLabel}
-          </span>
-        )}
-        <span className="alert-card__heading">
-          <RichAlertText text={alert.header || "Service alert"} />
-        </span>
+        <span className="alert-card__type">{label}</span>
       </summary>
-      {alert.description && alert.description !== alert.header && (
-        <div className="alert-card__details">
-          <RichAlertText text={alert.description} />
-        </div>
-      )}
+      <div className="alert-card__details">
+        {alert.timeLabel && (
+          <div className="alert-card__time">{alert.timeLabel}</div>
+        )}
+        {alert.header && (
+          <strong className="alert-card__heading">
+            <RichAlertText text={alert.header} />
+          </strong>
+        )}
+        {alert.description && alert.description !== alert.header && (
+          <div className="alert-card__description">
+            <RichAlertText text={alert.description} />
+          </div>
+        )}
+      </div>
     </details>
   );
 }
@@ -177,30 +179,77 @@ export function GroupedServiceAlerts({ alerts }) {
   );
 }
 
+function groupRouteAlerts(alerts) {
+  const groups = new Map();
+
+  for (const alert of alerts) {
+    const title = serviceAlertLabel(alert, "Service Alert");
+    const key = title.trim().toLowerCase();
+    const group = groups.get(key);
+
+    if (group) {
+      group.alerts.push(alert);
+    } else {
+      groups.set(key, {
+        alerts: [alert],
+        title,
+        tone: serviceAlertTone(alert),
+      });
+    }
+  }
+
+  return [...groups.values()];
+}
+
+function RouteAlertItem({ alert }) {
+  return (
+    <article className="route-service-alert__item">
+      {alert.timeLabel && (
+        <div className="route-service-alert__time">{alert.timeLabel}</div>
+      )}
+      {alert.header && <strong><RichAlertText text={alert.header} /></strong>}
+      {alert.description && alert.description !== alert.header && (
+        <div className="route-service-alert__description">
+          <RichAlertText text={alert.description} />
+        </div>
+      )}
+    </article>
+  );
+}
+
 export function RouteServiceAlerts({ alerts }) {
   if (!alerts.length) return null;
+  const groups = groupRouteAlerts(alerts);
+
   return (
     <section className="route-service-alerts" aria-labelledby="route-service-alerts-title">
       <h2 id="route-service-alerts-title">Service Alerts</h2>
       <div className="route-service-alerts__list">
-        {alerts.map((alert, index) => {
-          const tone = serviceAlertTone(alert);
-          const title = serviceAlertLabel(alert, "Service Alert");
-          return (
-            <details className={`route-service-alert route-service-alert--${tone}`} key={alert.id || index}>
-              <summary>
-                <span>{title}</span>
-              </summary>
-              <div className="route-service-alert__details">
-                {alert.timeLabel && <div className="route-service-alert__time">{alert.timeLabel}</div>}
-                {alert.header && <strong><RichAlertText text={alert.header} /></strong>}
-                {alert.description && alert.description !== alert.header && (
-                  <div><RichAlertText text={alert.description} /></div>
+        {groups.map((group) => (
+          <details
+            className={`route-service-alert route-service-alert--${group.tone}`}
+            key={group.title}
+          >
+            <summary>
+              <span className="route-service-alert__label">
+                <span>{group.title}</span>
+                {group.alerts.length > 1 && (
+                  <span className="route-service-alert__count">
+                    +{group.alerts.length - 1}
+                  </span>
                 )}
-              </div>
-            </details>
-          );
-        })}
+              </span>
+            </summary>
+            <div className="route-service-alert__details">
+              {group.alerts.map((alert, index) => (
+                <RouteAlertItem
+                  alert={alert}
+                  key={alert.id || index}
+                />
+              ))}
+            </div>
+          </details>
+        ))}
       </div>
     </section>
   );

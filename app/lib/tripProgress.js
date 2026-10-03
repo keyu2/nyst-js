@@ -2,6 +2,23 @@ export function parentStopId(stopId) {
   return String(stopId || "").replace(/[NS]$/, "");
 }
 
+export function selectedStopStatus(stopsAway, timestamp, now, unit = "minutes") {
+  if (stopsAway === null) return "passed";
+
+  const arrivalTime = Number(timestamp);
+  const currentTime = Number(now);
+  if (Number.isFinite(arrivalTime) && Number.isFinite(currentTime)) {
+    const secondsAway = arrivalTime - currentTime;
+    if (secondsAway <= 30) return "arriving now";
+    if (unit === "minutes") {
+      const minutesAway = Math.ceil(secondsAway / 60);
+      return `${minutesAway} min away`;
+    }
+  }
+
+  return `${stopsAway} ${stopsAway === 1 ? "stop" : "stops"} away`;
+}
+
 export function buildTripProgress(stopTimes, selectedStopId) {
   const nextStopIndex = stopTimes.findIndex((stopTime) => stopTime.future === true);
   const normalizedSelectedStopId = parentStopId(selectedStopId);

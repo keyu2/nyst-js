@@ -178,6 +178,7 @@ export async function getTrip(requestedRouteId, tripId) {
 
   return {
     id: tripId,
+    updatedAt: now,
     origin: stopObject(
       tripOriginStopId(staticStopTimes, realtimeStopTimes),
       data.stopsById

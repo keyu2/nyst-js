@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  applyRealtimeDetour,
   alertSectionStopIds,
   countActiveRuns,
   extendShortTurnPattern,
@@ -10,6 +11,18 @@ import {
   mostCompletePattern,
   offRouteTerminalBranches,
 } from "../app/lib/mta/routePattern.js";
+
+test("connects both ends of a realtime bridge reroute", () => {
+  const normalStops = [
+    "R31", "R30", "R29", "R28", "R27", "R26", "R25", "R24", "R23",
+    "R22", "R21",
+  ];
+  const result = applyRealtimeDetour(normalStops, [
+    { stopIds: ["R31", "R30", "Q01", "R22", "R21"] },
+  ]);
+
+  assert.deepEqual(result, ["R31", "R30", "Q01", "R22", "R21"]);
+});
 
 test("marks every realtime service-alert section without deleting the gaps", () => {
   const stops = [

@@ -48,7 +48,7 @@ function TrainList({ trains, stopId, now, showSeconds }) {
 
         return (
           <Link
-            key={`${train.trip?.id || "train"}-${index}`}
+            key={`${routeId}-${train.trip?.id || index}`}
             href={`/trip/${routeId}/${encodeURIComponent(train.trip?.id || "")}?from=${encodeURIComponent(stopId)}`}
             className="arrival-row"
           >

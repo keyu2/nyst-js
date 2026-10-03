@@ -13,6 +13,7 @@ const REALTIME_CACHE_MS = 15 * 1000;
 const ALERTS_CACHE_MS = 30 * 1000;
 const STATIC_TIMEOUT_MS = 15 * 1000;
 const LIVE_TIMEOUT_MS = 6 * 1000;
+const REGULAR_STOP_MINIMUM_TRIP_SHARE = 0.05;
 const REALTIME_FEEDS = [
   "gtfs", "gtfs-ace", "gtfs-bdfm", "gtfs-g", "gtfs-jz",
   "gtfs-l", "gtfs-nqrw", "gtfs-si",
@@ -64,6 +65,35 @@ function csv(zip, name) {
   });
 }
 
+export function buildRegularRouteIdsByStop(trips, stopTimesByTrip) {
+  const tripCountsByRoute = new Map();
+  const stopTripCounts = new Map();
+
+  for (const trip of trips) {
+    const routeId = normalizeRouteId(trip.route_id);
+    if (!routeId) continue;
+    tripCountsByRoute.set(routeId, (tripCountsByRoute.get(routeId) || 0) + 1);
+
+    const visitedStops = new Set(
+      (stopTimesByTrip.get(trip.trip_id) || []).map((stop) => stationStopId(stop.stop_id))
+    );
+    for (const stopId of visitedStops) {
+      const routeCounts = stopTripCounts.get(stopId) || new Map();
+      routeCounts.set(routeId, (routeCounts.get(routeId) || 0) + 1);
+      stopTripCounts.set(stopId, routeCounts);
+    }
+  }
+
+  return new Map([...stopTripCounts].map(([stopId, routeCounts]) => [
+    stopId,
+    new Set([...routeCounts]
+      .filter(([routeId, stopTrips]) => (
+        stopTrips / tripCountsByRoute.get(routeId) >= REGULAR_STOP_MINIMUM_TRIP_SHARE
+      ))
+      .map(([routeId]) => routeId)),
+  ]));
+}
+
 export async function getStatic() {
   return cachedFeed("static", STATIC_CACHE_MS, loadStatic);
 }
@@ -96,22 +126,18 @@ async function loadStatic() {
   }
 
   const stopTimesByTrip = new Map();
-  const routeIdsByStop = new Map();
   for (const stopTime of stopTimes) {
     const tripStopTimes = stopTimesByTrip.get(stopTime.trip_id) || [];
     tripStopTimes.push(stopTime);
     stopTimesByTrip.set(stopTime.trip_id, tripStopTimes);
 
-    const staticRouteId = tripsById.get(stopTime.trip_id)?.route_id;
-    if (!staticRouteId) continue;
-    const stopId = stationStopId(stopTime.stop_id);
-    const stopRoutes = routeIdsByStop.get(stopId) || new Set();
-    stopRoutes.add(normalizeRouteId(staticRouteId));
-    routeIdsByStop.set(stopId, stopRoutes);
   }
   for (const tripStopTimes of stopTimesByTrip.values()) {
     tripStopTimes.sort((a, b) => Number(a.stop_sequence) - Number(b.stop_sequence));
   }
+  // A few planned-work trips may use a station temporarily. Station bullets
+  // represent regular service, while those trips still remain in realtime data.
+  const routeIdsByStop = buildRegularRouteIdsByStop(trips, stopTimesByTrip);
 
   const sirLocalStopIds = trips
     .filter((trip) => normalizeRouteId(trip.route_id) === "SI")

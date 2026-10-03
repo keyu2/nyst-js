@@ -71,6 +71,10 @@ export function DirectionSelector({
         className="direction-slider"
         role="tablist"
         aria-label="Train direction"
+        style={{
+          "--direction-count": directionGroups.length,
+          "--direction-index": Math.max(0, directionGroups.findIndex((group) => group.id === activeDirectionGroup.id)),
+        }}
       >
         {directionGroups.map((group) => {
           const selected = group.id === activeDirectionGroup.id;

@@ -10,6 +10,7 @@ import {
 } from "./mta/helpers.js";
 import { getStationMetadata } from "./mta/metadata.js";
 import {
+  applyRealtimeDetour,
   alertSectionStopIds,
   countActiveRuns,
   extendShortTurnPattern,
@@ -181,8 +182,11 @@ export async function getRoute(id) {
   }
   hasRealtimeRouteService = activeRouteStopIds.size > 0;
   const realtimePattern = mostCompletePattern(currentRealtimePatterns);
+  const detouredStopIds = applyRealtimeDetour(normalStopIds, currentRealtimePatterns);
+  const hasRealtimeDetour = detouredStopIds !== normalStopIds;
+  if (hasRealtimeDetour) normalStopIds = detouredStopIds;
   const activeRuns = countActiveRuns(normalStopIds, activeRouteStopIds);
-  if (realtimePattern && activeRuns <= 1 && !hasSplitService) {
+  if (realtimePattern && activeRuns <= 1 && !hasSplitService && !hasRealtimeDetour) {
     normalStopIds = realtimePattern.stopIds;
   } else if (activeRuns > 1 && id !== "A" && id !== "5") {
     // A and 5 already have explicit permanent branch topology below. Their
@@ -204,6 +208,7 @@ export async function getRoute(id) {
       normalStopIds,
       nowMinute,
       realtimeEntities,
+      realtimePatterns: currentRealtimePatterns,
       routeStop,
       scheduledToday,
       stopTimesByTrip: data.stopTimesByTrip,

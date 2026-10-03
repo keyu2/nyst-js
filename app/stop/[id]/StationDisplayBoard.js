@@ -40,10 +40,10 @@ function directionLabel(trains, stopBorough, direction) {
 }
 
 const BoardAlerts = memo(function BoardAlerts({ alerts, layout }) {
-  if (!alerts.length) return null;
   return (
     <section className="display-board-alerts" aria-labelledby="display-board-alerts-title">
-      <h2 id="display-board-alerts-title">Service Alerts</h2>
+      <h2 id="display-board-alerts-title">Happening now</h2>
+      {!alerts.length && <p className="display-board-clear">No active alerts for the selected lines.</p>}
       <div className={`display-board-alert-list display-board-alert-list--${layout}`}>
         {alerts.map((alert, index) => (
           <details
@@ -70,7 +70,15 @@ const BoardAlerts = memo(function BoardAlerts({ alerts, layout }) {
   );
 });
 
-function BoardDirection({ direction, trains, stopBorough, stopId, now, showSeconds }) {
+function BoardDirection({
+  direction,
+  invertArrivingTrains,
+  trains,
+  stopBorough,
+  stopId,
+  now,
+  showSeconds,
+}) {
   const currentTrains = trains
     .filter((train) => Number(train.arrival?.time || train.departure?.time || 0) >= now - 30)
     .sort((a, b) =>
@@ -88,23 +96,41 @@ function BoardDirection({ direction, trains, stopBorough, stopId, now, showSecon
         {currentTrains.map((train, index) => {
           const routeId = train.trip?.route?.id || "?";
           const arrivalTime = Number(train.arrival?.time || train.departure?.time || 0);
+          const remainingSeconds = Math.max(0, arrivalTime - now);
+          const countdownMinutes = Math.floor(remainingSeconds / 60);
+          const isArriving = remainingSeconds < 60;
           const destinationId = train.destination?.id || "";
           const destination = destinationId.startsWith(stopId)
             ? "Terminating"
             : train.destination?.name || train.headsign || "Unknown destination";
           return (
             <Link
-              className="display-board-train"
+              className={`display-board-train${isArriving && invertArrivingTrains ? " display-board-train--arriving" : ""}`}
               href={`/trip/${routeId}/${encodeURIComponent(train.trip?.id || "")}?from=${encodeURIComponent(stopId)}`}
-              key={`${train.trip?.id || "train"}-${index}`}
+              key={`${routeId}-${train.trip?.id || index}`}
             >
-              <RouteBullet routeId={routeId} size={34} />
+              <RouteBullet routeId={routeId} size={56} />
               <span className="display-board-destination">
-                <strong>{destination}</strong>
+                <strong>{directionGroupLabel(stopBorough, train.destination?.borough, direction)}</strong>
+                <span>{destination}</span>
                 {train.delayMinutes && <small>Est. delayed {train.delayMinutes} min</small>}
               </span>
-              <strong className="display-board-time">
-                {formatArrivalCountdown(Math.max(0, arrivalTime - now), showSeconds)}
+              <strong
+                className="display-board-time"
+                aria-label={formatArrivalCountdown(remainingSeconds, showSeconds)}
+              >
+                <span
+                  className="display-board-countdown"
+                  aria-hidden="true"
+                >
+                  <span className="display-board-minute-stack">
+                    <span className="display-board-minutes">{countdownMinutes}</span>
+                    <small>MIN</small>
+                  </span>
+                  {showSeconds && (
+                    <sup>{String(remainingSeconds % 60).padStart(2, "0")}</sup>
+                  )}
+                </span>
               </strong>
             </Link>
           );
@@ -145,6 +171,7 @@ const RouteFilters = memo(function RouteFilters({
 export default function StationDisplayBoard({
   alertLayout,
   alertsByRoute,
+  invertArrivingTrains,
   northbound,
   initialTimestamp,
   routeIds,
@@ -178,7 +205,7 @@ export default function StationDisplayBoard({
 
   const currentDate = new Date(now * 1000);
   const dateLabel = DISPLAY_DATE_FORMATTER.format(currentDate);
-  const timeLabel = DISPLAY_TIME_FORMATTER.format(currentDate);
+  const timeParts = DISPLAY_TIME_FORMATTER.formatToParts(currentDate);
 
   return (
     <div className="station-trains station-trains--board">
@@ -190,6 +217,25 @@ export default function StationDisplayBoard({
           aria-label="Exit full screen"
         />
         <div className="display-board-fit" ref={fitRef}>
+          <div className="display-board-masthead">
+            <span className="display-board-brand">NYST</span>
+            <time dateTime={currentDate.toISOString()} title={dateLabel}>
+              {timeParts.map((part, index) => (
+                <span
+                  className={
+                    part.type === "second"
+                      ? "display-board-clock-seconds"
+                      : part.type === "dayPeriod"
+                        ? "display-board-clock-period"
+                        : undefined
+                  }
+                  key={`${part.type}-${index}`}
+                >
+                  {part.value}
+                </span>
+              ))}
+            </time>
+          </div>
           <header className="display-board-header">
             <div className="display-board-identity">
               {routeGroups.length > 1 ? (
@@ -204,7 +250,6 @@ export default function StationDisplayBoard({
                 </div>
               )}
               <h1>{stopName}</h1>
-              <time>{dateLabel} · {timeLabel}</time>
             </div>
             <div className="display-board-controls">
               <button type="button" onClick={() => window.history.back()}>Back</button>
@@ -218,6 +263,7 @@ export default function StationDisplayBoard({
           <div className="display-board-directions">
             <BoardDirection
               direction="northbound"
+              invertArrivingTrains={invertArrivingTrains}
               trains={filteredNorthbound}
               stopBorough={stopBorough}
               stopId={stopId}
@@ -226,6 +272,7 @@ export default function StationDisplayBoard({
             />
             <BoardDirection
               direction="southbound"
+              invertArrivingTrains={invertArrivingTrains}
               trains={filteredSouthbound}
               stopBorough={stopBorough}
               stopId={stopId}

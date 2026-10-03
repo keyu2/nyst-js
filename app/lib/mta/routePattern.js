@@ -51,6 +51,48 @@ export function countActiveRuns(stopIds, activeStopIds) {
   return runs;
 }
 
+export function applyRealtimeDetour(baseStopIds, patterns) {
+  const baseIndex = new Map(baseStopIds.map((stopId, index) => [stopId, index]));
+  let bestDetour = null;
+
+  for (const pattern of patterns) {
+    let stopIds = pattern?.stopIds || [];
+    const sharedStops = stopIds.filter((stopId) => baseIndex.has(stopId));
+    if (sharedStops.length < 2) continue;
+
+    if (baseIndex.get(sharedStops[0]) > baseIndex.get(sharedStops.at(-1))) {
+      stopIds = [...stopIds].reverse();
+    }
+
+    for (let index = 1; index < stopIds.length - 1; index += 1) {
+      if (baseIndex.has(stopIds[index])) continue;
+
+      const runStart = index;
+      while (index < stopIds.length && !baseIndex.has(stopIds[index])) index += 1;
+      const startId = stopIds[runStart - 1];
+      const endId = stopIds[index];
+      const startIndex = baseIndex.get(startId);
+      const endIndex = baseIndex.get(endId);
+      if (startIndex === undefined || endIndex === undefined || startIndex >= endIndex) {
+        continue;
+      }
+
+      const replacement = stopIds.slice(runStart - 1, index + 1);
+      const score = (endIndex - startIndex) * 100 + replacement.length;
+      if (!bestDetour || score > bestDetour.score) {
+        bestDetour = { startIndex, endIndex, replacement, score };
+      }
+    }
+  }
+
+  if (!bestDetour) return baseStopIds;
+  return [
+    ...baseStopIds.slice(0, bestDetour.startIndex),
+    ...bestDetour.replacement,
+    ...baseStopIds.slice(bestDetour.endIndex + 1),
+  ];
+}
+
 function normalizedStationName(value) {
   return String(value || "")
     .toLocaleLowerCase()

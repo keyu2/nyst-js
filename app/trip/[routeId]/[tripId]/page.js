@@ -99,7 +99,12 @@ export default async function TripPage({ params, searchParams }) {
         </div>
       )}
 
-      <TripTimeline progress={progress} routeId={routeId} stopTimes={stopTimes} />
+      <TripTimeline
+        initialTimestamp={trip.updatedAt}
+        progress={progress}
+        routeId={routeId}
+        stopTimes={stopTimes}
+      />
 
       <footer className="trip-footer">
         <div>Trip ID: {trip.id}</div>

@@ -36,6 +36,73 @@ test("builds A branches and restores one-direction Aqueduct service", () => {
   );
 });
 
+test("keeps realtime A local stops on the shared trunk", () => {
+  const leffertsTrip = { trip_id: "lefferts" };
+  const farRockawayTrip = { trip_id: "far-rockaway" };
+  const localTrip = { trip_id: "late-night-local" };
+  const staticTrunk = ["A02", "A20", "A30", "A48", "A51", "A55", "A61"];
+  const localTrunk = [
+    "A02",
+    "A20",
+    "A30",
+    "A48",
+    "A49",
+    "A50",
+    "A51",
+    "A52",
+    "A53",
+    "A54",
+    "A55",
+    "A61",
+  ];
+  const stopTimesByTrip = new Map([
+    ["lefferts", stopTimes([...staticTrunk, "A63", "A65"])],
+    ["far-rockaway", stopTimes([...staticTrunk, "H02", "H04", "H11"])],
+    ["late-night-local", stopTimes([...localTrunk, "H02", "H04", "H11"])],
+  ]);
+  const result = buildARouteBranches({
+    candidates: [leffertsTrip, farRockawayTrip, localTrip],
+    normalStopIds: [
+      "H11",
+      "H04",
+      "H02",
+      "A61",
+      "A55",
+      "A51",
+      "A50",
+      "A49",
+      "A48",
+      "A30",
+      "A20",
+    ],
+    nowMinute: 600,
+    realtimeEntities: [],
+    realtimePatterns: [
+      { stopIds: ["A20", "A30", "A48", "A49", "A50", "A51", "A55", "A61"] },
+      { stopIds: ["A61", "A55", "A54", "A53", "A52", "A51", "A48", "A30"] },
+    ],
+    routeStop,
+    scheduledToday: [leffertsTrip, farRockawayTrip],
+    stopTimesByTrip,
+  });
+
+  assert.deepEqual(result.normalStopIds, [
+    "A02",
+    "A20",
+    "A30",
+    "A48",
+    "A49",
+    "A50",
+    "A51",
+    "A52",
+    "A53",
+    "A54",
+    "A55",
+    "A61",
+  ]);
+  assert.equal(result.branches.length, 2);
+});
+
 test("orders the 5 north-to-south and exposes Nereid when realtime serves it", () => {
   const result = buildFiveRouteBranches({
     normalStopIds: ["101", "213", "501"],

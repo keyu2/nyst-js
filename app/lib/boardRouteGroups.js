@@ -8,9 +8,12 @@ function uniqueRouteIds(routeIds) {
 export function createBoardRouteGroups(routeIds, stationServices = []) {
   const groups = [];
   const groupedFamilies = new Set();
+  const availableFamilies = new Set(routeIds.map(routeFamily));
 
   for (const service of stationServices) {
-    const members = uniqueRouteIds(service.routes || []);
+    const members = uniqueRouteIds(
+      (service.routes || []).filter((routeId) => availableFamilies.has(routeFamily(routeId)))
+    );
     const families = uniqueRouteIds(members.map(routeFamily));
     if (!families.length || families.every((family) => groupedFamilies.has(family))) continue;
 

@@ -135,7 +135,12 @@ export default function StationTrains({
   stationServices = EMPTY_LIST,
 }) {
   const router = useRouter();
-  const { showSeconds, stationView, boardAlertLayout } = useSubwayPreferences();
+  const {
+    boardAlertLayout,
+    boardArrivalInversion,
+    showSeconds,
+    stationView,
+  } = useSubwayPreferences();
   const requestedRouteId = String(requestedRoute || "").trim();
   const requestedRouteFamily = routeFamily(requestedRouteId);
   const { routeIds, routeFamilies, familyIds } = useMemo(
@@ -147,9 +152,16 @@ export default function StationTrains({
     ),
     [northbound, requestedRouteId, southbound, stationServices]
   );
+  const boardRouteIds = useMemo(() => [...new Set(
+    [...northbound, ...southbound]
+      .map((train) => train.trip?.route?.id)
+      .filter(Boolean)
+  )].sort((left, right) => (
+    left.localeCompare(right, undefined, { numeric: true })
+  )), [northbound, southbound]);
   const boardRouteGroups = useMemo(
-    () => createBoardRouteGroups(routeIds, stationServices),
-    [routeIds, stationServices]
+    () => createBoardRouteGroups(boardRouteIds, stationServices),
+    [boardRouteIds, stationServices]
   );
 
   const [selectedRoute, setSelectedRoute] = useState(
@@ -203,9 +215,10 @@ export default function StationTrains({
       <StationDisplayBoard
         alertsByRoute={alertsByRoute}
         alertLayout={boardAlertLayout}
+        invertArrivingTrains={boardArrivalInversion}
         northbound={northbound}
         initialTimestamp={now}
-        routeIds={routeIds}
+        routeIds={boardRouteIds}
         routeGroups={boardRouteGroups}
         showSeconds={showSeconds}
         southbound={southbound}
