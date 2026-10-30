@@ -9,7 +9,10 @@ import TrainDirection from "./TrainDirection";
 import { DirectionSelector, StationRouteTabs } from "./StationControls";
 import { useSubwayPreferences } from "../../lib/preferences";
 import { routeFamily } from "../../lib/routes";
-import { createBoardRouteGroups } from "../../lib/boardRouteGroups";
+import {
+  createBoardRouteGroups,
+  createStationRouteFamilies,
+} from "../../lib/boardRouteGroups";
 import {
   directionGroupLabel,
   disambiguateDirectionGroupLabels,
@@ -42,26 +45,6 @@ function destinationOptions(directionId, trains) {
 function directionKey(option) {
   const direction = option.id.split(":", 1)[0];
   return `${direction}:${option.label.trim().toLocaleLowerCase()}`;
-}
-
-function stationRouteFamilies(northbound, southbound, stationServices, requestedRouteId) {
-  const routeIds = [...new Set(
-    [...northbound, ...southbound]
-      .map((train) => train.trip?.route?.id)
-      .concat(stationServices.flatMap((service) => service.routes || []))
-      .concat(requestedRouteId)
-      .filter(Boolean)
-  )].sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
-  const routeFamilies = new Map();
-
-  for (const routeId of routeIds) {
-    const familyId = routeFamily(routeId);
-    const members = routeFamilies.get(familyId) || [];
-    members.push(routeId);
-    routeFamilies.set(familyId, members);
-  }
-
-  return { routeIds, routeFamilies, familyIds: [...routeFamilies.keys()] };
 }
 
 function routeDirectionOptions({
@@ -136,7 +119,6 @@ export default function StationTrains({
 }) {
   const router = useRouter();
   const {
-    boardAlertLayout,
     boardArrivalInversion,
     showSeconds,
     stationView,
@@ -144,9 +126,10 @@ export default function StationTrains({
   const requestedRouteId = String(requestedRoute || "").trim();
   const requestedRouteFamily = routeFamily(requestedRouteId);
   const { routeIds, routeFamilies, familyIds } = useMemo(
-    () => stationRouteFamilies(
-      northbound,
-      southbound,
+    () => createStationRouteFamilies(
+      [...northbound, ...southbound]
+        .map((train) => train.trip?.route?.id)
+        .filter(Boolean),
       stationServices,
       requestedRouteId
     ),
@@ -214,7 +197,6 @@ export default function StationTrains({
     return (
       <StationDisplayBoard
         alertsByRoute={alertsByRoute}
-        alertLayout={boardAlertLayout}
         invertArrivingTrains={boardArrivalInversion}
         northbound={northbound}
         initialTimestamp={now}

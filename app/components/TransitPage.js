@@ -1,9 +1,8 @@
 import {
   getRoute,
-  getRouteAlerts,
+  getRouteAlertSnapshot,
   getRoutes,
   getRouteServiceAvailability,
-  getRouteStatuses,
   getStations,
 } from "../lib/mta";
 import StatusHome from "./home/StatusHome";
@@ -16,9 +15,8 @@ export default async function TransitPage({ view, section, requestedRouteId }) {
     : availableRoutes.has("1")
       ? "1"
       : routes[0]?.id;
-  const [routeStatuses, alertEntries, focusedRoute, focusedRouteAvailable] = await Promise.all([
-    getRouteStatuses([...availableRoutes]),
-    Promise.all([...availableRoutes].map(async (id) => [id, await getRouteAlerts(id)])),
+  const [{ routeAlerts, routeStatuses }, focusedRoute, focusedRouteAvailable] = await Promise.all([
+    getRouteAlertSnapshot([...availableRoutes]),
     activeRouteId ? getRoute(activeRouteId) : null,
     activeRouteId ? getRouteServiceAvailability(activeRouteId) : null,
   ]);
@@ -31,7 +29,7 @@ export default async function TransitPage({ view, section, requestedRouteId }) {
       stations={stations}
       routeIds={[...availableRoutes]}
       routeStatuses={routeStatuses}
-      routeAlerts={Object.fromEntries(alertEntries)}
+      routeAlerts={routeAlerts}
       focusedRouteId={activeRouteId}
       focusedRoute={focusedRoute}
       focusedRouteAvailable={focusedRouteAvailable}

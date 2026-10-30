@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { Maximize, Minimize } from "lucide-react";
+import { useRouter } from "next/navigation";
 import RouteBullet from "../../components/RouteBullet";
 import { RichAlertText } from "../../components/ServiceAlerts";
 import { serviceAlertLabel, serviceAlertTone } from "../../lib/alertClassification";
@@ -23,6 +24,7 @@ const DISPLAY_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   second: "2-digit",
 });
+const ALERT_SLIDE_DURATION_MS = 15_000;
 
 function directionLabel(trains, stopBorough, direction) {
   const parts = new Set();
@@ -39,13 +41,49 @@ function directionLabel(trains, stopBorough, direction) {
   return [...parts].join(" / ") || (direction === "northbound" ? "Northbound" : "Southbound");
 }
 
-const BoardAlerts = memo(function BoardAlerts({ alerts, layout }) {
+function BoardAlertCarousel({ alerts }) {
+  const pages = [];
+  for (let index = 0; index < alerts.length; index += 2) {
+    pages.push(alerts.slice(index, index + 2));
+  }
+  const [activePageIndex, setActivePageIndex] = useState(0);
+  const activeAlerts = pages[activePageIndex];
+
+  useEffect(() => {
+    if (pages.length < 2) return undefined;
+    const timer = window.setTimeout(() => {
+      setActivePageIndex((index) => (index + 1) % pages.length);
+    }, ALERT_SLIDE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [activePageIndex, pages.length]);
+
   return (
-    <section className="display-board-alerts" aria-labelledby="display-board-alerts-title">
-      <h2 id="display-board-alerts-title">Happening now</h2>
-      {!alerts.length && <p className="display-board-clear">No active alerts for the selected lines.</p>}
-      <div className={`display-board-alert-list display-board-alert-list--${layout}`}>
-        {alerts.map((alert, index) => (
+    <>
+      <div
+        className="display-board-alert-progress"
+        style={{
+          "--display-alert-count": pages.length,
+          "--display-alert-duration": `${ALERT_SLIDE_DURATION_MS}ms`,
+        }}
+        aria-hidden="true"
+      >
+        {pages.map((page, index) => (
+          <span
+            className={
+              pages.length === 1 || index < activePageIndex
+                ? "complete"
+                : index === activePageIndex
+                  ? "active"
+                  : undefined
+            }
+            key={page.map((alert) => alert.id || alert.header).join("|") || index}
+          >
+            <i />
+          </span>
+        ))}
+      </div>
+      <div className="display-board-alert-slide" aria-live="polite" aria-atomic="true">
+        {activeAlerts.map((alert, index) => (
           <details
             className={`display-board-alert display-board-alert--${serviceAlertTone(alert)}`}
             open
@@ -55,7 +93,9 @@ const BoardAlerts = memo(function BoardAlerts({ alerts, layout }) {
               <span>{serviceAlertLabel(alert)}</span>
               <strong><RichAlertText text={alert.header || "Service alert"} /></strong>
             </summary>
-            {(alert.timeLabel || (alert.description && alert.description !== alert.header)) && (
+            {(alert.timeLabel || (
+              alert.description && alert.description !== alert.header
+            )) && (
               <div className="display-board-alert__details">
                 {alert.timeLabel && <b>{alert.timeLabel}</b>}
                 {alert.description && alert.description !== alert.header && (
@@ -66,6 +106,22 @@ const BoardAlerts = memo(function BoardAlerts({ alerts, layout }) {
           </details>
         ))}
       </div>
+    </>
+  );
+}
+
+const BoardAlerts = memo(function BoardAlerts({ alerts }) {
+  const carouselKey = alerts
+    .map((alert, index) => alert.id || `${alert.header}-${index}`)
+    .join("|");
+
+  return (
+    <section className="display-board-alerts" aria-labelledby="display-board-alerts-title">
+      <h2 id="display-board-alerts-title">Happening now</h2>
+      {!alerts.length && <p className="display-board-clear">No active alerts for the selected lines.</p>}
+      {alerts.length > 0 && (
+        <BoardAlertCarousel alerts={alerts} key={carouselKey} />
+      )}
     </section>
   );
 });
@@ -169,7 +225,6 @@ const RouteFilters = memo(function RouteFilters({
 });
 
 export default function StationDisplayBoard({
-  alertLayout,
   alertsByRoute,
   invertArrivingTrains,
   northbound,
@@ -182,6 +237,7 @@ export default function StationDisplayBoard({
   stopId,
   stopName,
 }) {
+  const router = useRouter();
   const now = useLiveTimestamp(initialTimestamp);
   const {
     alerts,
@@ -252,7 +308,15 @@ export default function StationDisplayBoard({
               <h1>{stopName}</h1>
             </div>
             <div className="display-board-controls">
-              <button type="button" onClick={() => window.history.back()}>Back</button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.history.length > 1) window.history.back();
+                  else router.push("/subway");
+                }}
+              >
+                Back
+              </button>
               <Link href="/settings">Settings</Link>
               <button type="button" onClick={toggleFullscreen} aria-pressed={fullscreen}>
                 {fullscreen ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
@@ -283,7 +347,7 @@ export default function StationDisplayBoard({
           {!filteredNorthbound.length && !filteredSouthbound.length && (
             <p className="display-board-empty">No upcoming trains reported.</p>
           )}
-          <BoardAlerts alerts={alerts} layout={alertLayout} />
+          <BoardAlerts alerts={alerts} />
         </div>
       </section>
     </div>

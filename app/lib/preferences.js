@@ -14,8 +14,8 @@ const DEFAULT_PREFERENCES = Object.freeze({
   showSeconds: false,
   tripProgressUnit: "minutes",
   lineView: "overview",
+  mobileLineLayout: "grouped",
   stationView: "standard",
-  boardAlertLayout: "columns",
   boardArrivalInversion: true,
 });
 
@@ -27,8 +27,8 @@ function normalizePreferences(value) {
     showSeconds: value?.showSeconds === true,
     tripProgressUnit: value?.tripProgressUnit === "stops" ? "stops" : "minutes",
     lineView: value?.lineView === "focus" ? "focus" : "overview",
+    mobileLineLayout: value?.mobileLineLayout === "rows" ? "rows" : "grouped",
     stationView: value?.stationView === "board" ? "board" : "standard",
-    boardAlertLayout: value?.boardAlertLayout === "stacked" ? "stacked" : "columns",
     boardArrivalInversion: value?.boardArrivalInversion !== false,
   };
 }
@@ -63,8 +63,8 @@ export function useSubwayPreferences() {
     setShowSeconds: (showSeconds) => updatePreferences({ showSeconds }),
     setTripProgressUnit: (tripProgressUnit) => updatePreferences({ tripProgressUnit }),
     setLineView: (lineView) => updatePreferences({ lineView }),
+    setMobileLineLayout: (mobileLineLayout) => updatePreferences({ mobileLineLayout }),
     setStationView: (stationView) => updatePreferences({ stationView }),
-    setBoardAlertLayout: (boardAlertLayout) => updatePreferences({ boardAlertLayout }),
     setBoardArrivalInversion: (boardArrivalInversion) => updatePreferences({ boardArrivalInversion }),
   };
 }

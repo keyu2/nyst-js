@@ -2,16 +2,16 @@ import BackButton from "../../components/BackButton";
 import HomeButton from "../../components/HomeButton";
 import RouteBullet from "../../components/RouteBullet";
 import { RouteServiceAlerts } from "../../components/ServiceAlerts";
-import { getRoute, getRouteAlerts, getRouteServiceAvailability } from "../../lib/mta";
+import { getRoute, getRouteServiceAvailability } from "../../lib/mta";
 import RouteStops from "./RouteStops";
 
 export default async function RoutePage({ params }) {
   const { id } = await params;
-  const [route, alerts, serviceAvailable] = await Promise.all([
+  const [route, serviceAvailable] = await Promise.all([
     getRoute(id),
-    getRouteAlerts(id),
     getRouteServiceAvailability(id),
   ]);
+  const alerts = route.alerts || [];
   const serviceMap =
     route.serviceMaps?.find((map) => map.configId === "alltimes") ||
     route.serviceMaps?.[0];
@@ -19,7 +19,7 @@ export default async function RoutePage({ params }) {
 
   return (
     <main className="page-shell route-page">
-      <BackButton href="/" />
+      <BackButton href="/subway" />
       <HomeButton />
 
       <div className="route-page-header">

@@ -5,7 +5,27 @@ import { ChevronRight, Star } from "lucide-react";
 import { useMemo } from "react";
 import RouteBullet from "../RouteBullet";
 import { stationRouteIds } from "../../lib/stationDiscovery";
-import { ROUTE_STATUS } from "./config";
+import { useSubwayPreferences } from "../../lib/preferences";
+import { MOBILE_LINE_SECTIONS, ROUTE_FAMILIES, ROUTE_STATUS } from "./config";
+
+function RouteButtons({ group, available, routeStatuses, size = 40 }) {
+  return group.map((routeId) => {
+    if (!available.has(routeId)) return null;
+    const status = ROUTE_STATUS[routeStatuses[routeId]];
+    const statusLabel = status ? `, ${status.label}` : "";
+    return (
+      <Link
+        className="new-route-button"
+        href={`/route/${routeId}`}
+        aria-label={`${routeId} train${statusLabel}`}
+        key={routeId}
+      >
+        <RouteBullet routeId={routeId} size={size} />
+        {status && <span title={status.label} style={{ background: status.color }} />}
+      </Link>
+    );
+  });
+}
 
 export function StationItem({ station, distance, preferredStopId, preferredRoute }) {
   const routes = stationRouteIds(station);
@@ -40,29 +60,80 @@ export function StationItem({ station, distance, preferredStopId, preferredRoute
 }
 
 export function LineList({ groups, available, routeStatuses }) {
+  const { mobileLineLayout } = useSubwayPreferences();
+
   return (
-    <section className="new-line-list" aria-label="Subway lines">
-      {groups.map((group) => (
-        <div className="new-line-row" key={group.join("-")}>
-          {group.map((routeId) => {
-            if (!available.has(routeId)) return null;
-            const status = ROUTE_STATUS[routeStatuses[routeId]];
-            const statusLabel = status ? `, ${status.label}` : "";
-            return (
-              <Link
-                className="new-route-button"
-                href={`/route/${routeId}`}
-                aria-label={`${routeId} train${statusLabel}`}
-                key={routeId}
-              >
-                <RouteBullet routeId={routeId} size={40} />
-                {status && <span title={status.label} style={{ background: status.color }} />}
-              </Link>
-            );
-          })}
-        </div>
-      ))}
-    </section>
+    <>
+      <section
+        className={`new-line-list new-line-list--desktop${mobileLineLayout === "rows" ? " new-line-list--mobile-selected" : ""}`}
+        aria-label="Subway lines"
+      >
+        {groups.map((group) => {
+          const family = ROUTE_FAMILIES.find(({ routes }) => (
+            group.some((routeId) => routes.includes(routeId))
+          ));
+
+          return (
+            <div
+              className="new-line-row"
+              key={group.join("-")}
+              style={{ "--route-family-color": family?.color || "#808183" }}
+            >
+              <span className="new-line-family">{family?.name || "Subway"}</span>
+              <div className="new-line-bullets">
+                <RouteButtons
+                  group={group}
+                  available={available}
+                  routeStatuses={routeStatuses}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section
+        className={`new-line-list new-line-list--mobile-bands${mobileLineLayout === "grouped" ? " new-line-list--mobile-selected" : ""}`}
+        aria-label="Subway lines"
+      >
+        {MOBILE_LINE_SECTIONS.map((section) => {
+          const sectionGroups = section.families.map((familyIndex) => ({
+            family: ROUTE_FAMILIES[familyIndex],
+            familyIndex,
+            group: groups[familyIndex] || [],
+            label: section.labels?.[familyIndex] || ROUTE_FAMILIES[familyIndex]?.name,
+          }));
+          const familyCount = sectionGroups.length;
+
+          return (
+            <div
+              className={`new-line-mobile-section new-line-mobile-section--${familyCount} new-line-mobile-section--${section.layout || "standard"}`}
+              key={section.families.join("-")}
+            >
+              {sectionGroups.map(({ family, group, label }) => (
+                <div
+                  className="new-line-mobile-family"
+                  key={group.join("-") || family?.name}
+                  style={{ "--route-family-color": family?.color || "#808183" }}
+                >
+                  <span className="new-line-mobile-heading">
+                    <strong>{label || "Subway"}</strong>
+                  </span>
+                  <span className="new-line-mobile-bullets">
+                    <RouteButtons
+                      group={group}
+                      available={available}
+                      routeStatuses={routeStatuses}
+                      size={46}
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </section>
+    </>
   );
 }
 

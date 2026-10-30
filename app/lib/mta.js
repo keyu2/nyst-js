@@ -22,7 +22,7 @@ import { buildARouteBranches, buildFiveRouteBranches } from "./mta/routeBranches
 import { currentNewYorkMinute, unixSeconds } from "./time.js";
 import { getRouteAlerts } from "./mta/alerts.js";
 
-export { getRouteAlerts, getRouteStatuses } from "./mta/alerts.js";
+export { getRouteAlerts, getRouteAlertSnapshot, getRouteStatuses } from "./mta/alerts.js";
 export {
   getRoutes,
   getRouteServiceAvailability,
@@ -233,5 +233,11 @@ export async function getRoute(id) {
   })));
 
   const stops = normalStopIds.map(routeStop);
-  return { id, color: ROUTE_COLORS[id], serviceMaps: [{ configId: "alltimes", stops }], branches };
+  return {
+    id,
+    color: ROUTE_COLORS[id],
+    serviceMaps: [{ configId: "alltimes", stops }],
+    branches,
+    alerts: routeAlerts,
+  };
 }

@@ -24,47 +24,68 @@ function isActiveAlert(alert, now) {
   });
 }
 
-export async function getRouteAlerts(routeId) {
+function routeAlert(entity) {
+  const alert = entity.alert;
+  const alertType = alert.mercury?.alert_type || "";
+  const planned = isPlannedServiceAlert({ cause: alert.cause, alertType });
+
+  return {
+    id: entity.id,
+    header: translatedText(alert.headerText),
+    description: translatedText(alert.descriptionText),
+    alertType,
+    timeLabel: translatedText(alert.mercury?.human_readable_active_period),
+    category: planned ? "planned" : "happening",
+  };
+}
+
+export function buildRouteAlertSnapshot(entities, routeIds, now = Math.floor(Date.now() / 1000)) {
+  const requestedRoutes = new Map(
+    routeIds.map((routeId) => [normalizeRouteId(routeId), routeId])
+  );
+  const routeAlerts = Object.fromEntries(routeIds.map((routeId) => [routeId, []]));
+  const routeStatuses = {};
+
+  for (const entity of entities) {
+    const alert = entity.alert;
+    if (!alert || !isActiveAlert(alert, now)) continue;
+
+    const informedRoutes = new Set(
+      (alert.informedEntity || [])
+        .map((item) => requestedRoutes.get(normalizeRouteId(item.routeId)))
+        .filter(Boolean)
+    );
+    if (!informedRoutes.size) continue;
+
+    const normalizedAlert = routeAlert(entity);
+    if (!normalizedAlert.header && !normalizedAlert.description) continue;
+    const status = serviceAlertStatus(normalizedAlert);
+
+    for (const routeId of informedRoutes) {
+      routeAlerts[routeId].push(normalizedAlert);
+      if (
+        !routeStatuses[routeId] ||
+        STATUS_SEVERITY[status] > STATUS_SEVERITY[routeStatuses[routeId]]
+      ) {
+        routeStatuses[routeId] = status;
+      }
+    }
+  }
+
+  return { routeAlerts, routeStatuses };
+}
+
+export async function getRouteAlertSnapshot(routeIds) {
   const entities = await getAlertsFeed();
-  const now = Math.floor(Date.now() / 1000);
+  return buildRouteAlertSnapshot(entities, routeIds);
+}
 
-  return entities
-    .filter(({ alert }) => (
-      alert &&
-      isActiveAlert(alert, now) &&
-      (alert.informedEntity || []).some(
-        (item) => normalizeRouteId(item.routeId) === routeId
-      )
-    ))
-    .map((entity) => {
-      const alert = entity.alert;
-      const alertType = alert.mercury?.alert_type || "";
-      const planned = isPlannedServiceAlert({ cause: alert.cause, alertType });
-
-      return {
-        id: entity.id,
-        header: translatedText(alert.headerText),
-        description: translatedText(alert.descriptionText),
-        alertType,
-        timeLabel: translatedText(alert.mercury?.human_readable_active_period),
-        category: planned ? "planned" : "happening",
-      };
-    })
-    .filter((alert) => alert.header || alert.description);
+export async function getRouteAlerts(routeId) {
+  const { routeAlerts } = await getRouteAlertSnapshot([routeId]);
+  return routeAlerts[routeId];
 }
 
 export async function getRouteStatuses(routeIds) {
-  const statuses = {};
-
-  await Promise.all(routeIds.map(async (routeId) => {
-    const alerts = await getRouteAlerts(routeId);
-    for (const alert of alerts) {
-      const status = serviceAlertStatus(alert);
-      if (!statuses[routeId] || STATUS_SEVERITY[status] > STATUS_SEVERITY[statuses[routeId]]) {
-        statuses[routeId] = status;
-      }
-    }
-  }));
-
-  return statuses;
+  const { routeStatuses } = await getRouteAlertSnapshot(routeIds);
+  return routeStatuses;
 }

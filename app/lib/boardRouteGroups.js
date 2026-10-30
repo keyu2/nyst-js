@@ -30,3 +30,26 @@ export function createBoardRouteGroups(routeIds, stationServices = []) {
 
   return groups;
 }
+
+export function createStationRouteFamilies(
+  realtimeRouteIds,
+  stationServices = [],
+  requestedRouteId = ""
+) {
+  const fallbackRouteIds = stationServices
+    .flatMap((service) => service.routes || [])
+    .concat(requestedRouteId);
+  const routeIds = uniqueRouteIds(
+    realtimeRouteIds.length ? realtimeRouteIds : fallbackRouteIds
+  );
+  const routeFamilies = new Map();
+
+  for (const routeId of routeIds) {
+    const familyId = routeFamily(routeId);
+    const members = routeFamilies.get(familyId) || [];
+    members.push(routeId);
+    routeFamilies.set(familyId, members);
+  }
+
+  return { routeIds, routeFamilies, familyIds: [...routeFamilies.keys()] };
+}

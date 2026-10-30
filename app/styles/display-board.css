@@ -129,6 +129,29 @@
 }
 .display-board-alerts { margin-top: auto; padding: 24px 0 0; border-color: #7287ac; }
 .display-board-alerts h2 { color: #d5e5ff; font-size: 26px; }
+.display-board-alert-progress {
+  display: grid;
+  grid-template-columns: repeat(var(--display-alert-count), minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.display-board-alert-progress > span {
+  height: 4px;
+  overflow: hidden;
+  background: #52617e;
+}
+.display-board-alert-progress i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.display-board-alert-progress > .complete i { transform: scaleX(1); }
+.display-board-alert-progress > .active i {
+  animation: display-board-alert-progress var(--display-alert-duration) linear forwards;
+}
 .display-board-alert { overflow: hidden; background: #101829; border-radius: 14px; border-color: #52617e; border-left-color: var(--display-alert-color); }
 .display-board-alert summary > span { color: #91b7ff; }
 .display-board-alert--warning summary > span { color: #ffcf82; }
@@ -162,3 +185,7 @@
 .station-display-board:fullscreen .display-board-train { min-height: 84px; padding-block: 12px; }
 .station-display-board:fullscreen .display-board-direction h2 { padding-top: 0; }
 .station-display-board:fullscreen .display-board-alerts { margin-top: auto; padding-top: 20px; }
+
+@keyframes display-board-alert-progress {
+  to { transform: scaleX(1); }
+}

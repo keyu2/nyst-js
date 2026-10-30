@@ -50,7 +50,7 @@ export default async function StopPage({ params, searchParams }) {
 
   return (
     <main className="page-shell stop-page">
-      <BackButton href={route ? `/route/${encodeURIComponent(route)}` : "/"} />
+      <BackButton href={route ? `/route/${encodeURIComponent(route)}` : "/subway"} />
       <HomeButton />
 
       <div className="stop-page-heading">

@@ -1,6 +1,7 @@
 "use client";
 
 import AppTabs from "../components/AppTabs";
+import BackButton from "../components/BackButton";
 import { useSubwayPreferences } from "../lib/preferences";
 import { useThemePreference } from "../lib/themePreference";
 
@@ -21,17 +22,17 @@ const DISPLAY_MODE_OPTIONS = [
   { value: "standard", label: "Standard" },
   { value: "board", label: "Display board" },
 ];
-const ALERT_LAYOUT_OPTIONS = [
-  { value: "stacked", label: "Stacked" },
-  { value: "columns", label: "Side by side" },
-];
 const ARRIVAL_INVERSION_OPTIONS = [
   { value: "on", label: "On" },
   { value: "off", label: "Off" },
 ];
 const LINE_SELECTION_OPTIONS = [
-  { value: "overview", label: "Traditional" },
-  { value: "focus", label: "Slider" },
+  { value: "overview", label: "All lines" },
+  { value: "focus", label: "One at a time" },
+];
+const MOBILE_LINE_LAYOUT_OPTIONS = [
+  { value: "grouped", label: "Grouped" },
+  { value: "rows", label: "Full rows" },
 ];
 
 function SegmentedSetting({ label, value, options, onChange }) {
@@ -64,14 +65,14 @@ export default function SettingsClient() {
     showSeconds,
     tripProgressUnit,
     lineView,
+    mobileLineLayout,
     stationView,
-    boardAlertLayout,
     boardArrivalInversion,
     setShowSeconds,
     setTripProgressUnit,
     setLineView,
+    setMobileLineLayout,
     setStationView,
-    setBoardAlertLayout,
     setBoardArrivalInversion,
   } = useSubwayPreferences();
   const { theme, setTheme } = useThemePreference();
@@ -81,6 +82,7 @@ export default function SettingsClient() {
       <div className="new-status-page">
         <AppTabs active="settings" />
         <header className="settings-header">
+          <BackButton />
           <h1>Settings</h1>
         </header>
 
@@ -117,27 +119,26 @@ export default function SettingsClient() {
           />
 
           {stationView === "board" && (
-            <>
-              <SegmentedSetting
-                label="Service alerts"
-                value={boardAlertLayout}
-                onChange={setBoardAlertLayout}
-                options={ALERT_LAYOUT_OPTIONS}
-              />
-              <SegmentedSetting
-                label="0-minute inversion"
-                value={boardArrivalInversion ? "on" : "off"}
-                onChange={(value) => setBoardArrivalInversion(value === "on")}
-                options={ARRIVAL_INVERSION_OPTIONS}
-              />
-            </>
+            <SegmentedSetting
+              label="0-minute inversion"
+              value={boardArrivalInversion ? "on" : "off"}
+              onChange={(value) => setBoardArrivalInversion(value === "on")}
+              options={ARRIVAL_INVERSION_OPTIONS}
+            />
           )}
 
           <SegmentedSetting
-            label="Line selection"
+            label="Home line selector"
             value={lineView}
             onChange={setLineView}
             options={LINE_SELECTION_OPTIONS}
+          />
+
+          <SegmentedSetting
+            label="Mobile line layout"
+            value={mobileLineLayout}
+            onChange={setMobileLineLayout}
+            options={MOBILE_LINE_LAYOUT_OPTIONS}
           />
         </div>
       </div>

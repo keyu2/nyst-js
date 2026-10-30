@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBoardRouteGroups } from "../app/lib/boardRouteGroups.js";
+import {
+  createBoardRouteGroups,
+  createStationRouteFamilies,
+} from "../app/lib/boardRouteGroups.js";
 import { buildRegularRouteIdsByStop } from "../app/lib/mta/feeds.js";
 
 test("keeps temporary reroutes out of a station's regular route bullets", () => {
@@ -47,4 +50,25 @@ test("hides a regular route when it has no current board service", () => {
     createBoardRouteGroups(["3"], [{ id: "251", routes: ["3", "4"] }]),
     [{ id: "3", members: ["3"] }]
   );
+});
+
+test("hides a station route tab when realtime service is absent", () => {
+  const { routeIds, routeFamilies } = createStationRouteFamilies(
+    ["3"],
+    [{ id: "251", routes: ["3", "4"] }],
+    "4"
+  );
+
+  assert.deepEqual(routeIds, ["3"]);
+  assert.deepEqual([...routeFamilies], [["3", ["3"]]]);
+});
+
+test("falls back to regular station routes when realtime service is unavailable", () => {
+  const { routeIds } = createStationRouteFamilies(
+    [],
+    [{ id: "251", routes: ["3", "4"] }],
+    "4"
+  );
+
+  assert.deepEqual(routeIds, ["3", "4"]);
 });
