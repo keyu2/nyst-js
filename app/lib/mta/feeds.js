@@ -115,6 +115,18 @@ async function loadStatic() {
   const calendar = csv(zip, "calendar.txt");
   const calendarDates = csv(zip, "calendar_dates.txt");
   const transfers = csv(zip, "transfers.txt");
+  const shapes = csv(zip, "shapes.txt");
+  const shapesById = new Map();
+  for (const point of shapes) {
+    const shapePoints = shapesById.get(point.shape_id) || [];
+    shapePoints.push(point);
+    shapesById.set(point.shape_id, shapePoints);
+  }
+  for (const shapePoints of shapesById.values()) {
+    shapePoints.sort((left, right) => (
+      Number(left.shape_pt_sequence) - Number(right.shape_pt_sequence)
+    ));
+  }
 
   const stopsById = new Map(stops.map((stop) => [stop.stop_id, stop]));
   const tripsById = new Map(trips.map((trip) => [trip.trip_id, trip]));
@@ -176,6 +188,8 @@ async function loadStatic() {
     calendar,
     calendarDates,
     transfers,
+    shapes,
+    shapesById,
     routeIdsByStop,
     transferStopIdsByStop,
   };

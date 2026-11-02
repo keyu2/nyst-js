@@ -11,7 +11,6 @@ import {
   connectedStopIds,
   displayTripRouteId,
   realtimeRouteIdsByStop,
-  scheduledTerminiAtStop,
   stopObject,
 } from "./helpers.js";
 import { getStationMetadata } from "./metadata.js";
@@ -26,7 +25,7 @@ function transferRoutesAtStop(stopId, baseStopId, routesByStop) {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-export async function getStop(id, requestedRouteId) {
+export async function getStop(id) {
   const [data, entities, metadata] = await Promise.all([
     getStatic(),
     getRealtime(),
@@ -136,7 +135,6 @@ export async function getStop(id, requestedRouteId) {
     stopTimes,
     services,
     transfers,
-    scheduledTermini: scheduledTerminiAtStop(data, id, requestedRouteId, metadata),
     generatedAt: now,
   };
 }

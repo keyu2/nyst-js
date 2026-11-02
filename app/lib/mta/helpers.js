@@ -133,44 +133,6 @@ export function compatibleStopTime(update, trip, stopsById, now) {
   };
 }
 
-export function scheduledTerminiAtStop(data, stopId, requestedRouteId, metadata) {
-  if (!requestedRouteId) return [];
-
-  const targetFamily = routeFamily(requestedRouteId);
-  const countsByDirection = new Map();
-
-  for (const trip of data.trips) {
-    if (routeFamily(trip.route_id) !== targetFamily) continue;
-
-    const tripStops = data.stopTimesByTrip.get(trip.trip_id) || [];
-    const stationStop = tripStops.find(
-      (item) => stationStopId(item.stop_id) === stationStopId(stopId)
-    );
-    if (!stationStop) continue;
-
-    const direction = stationStop.stop_id?.match(/[NS]$/)?.[0];
-    const terminalStopId = tripStops.at(-1)?.stop_id;
-    if (!direction || !terminalStopId) continue;
-
-    const directionCounts = countsByDirection.get(direction) || new Map();
-    directionCounts.set(terminalStopId, (directionCounts.get(terminalStopId) || 0) + 1);
-    countsByDirection.set(direction, directionCounts);
-  }
-
-  return [...countsByDirection.entries()]
-    .map(([direction, counts]) => {
-      const [terminalStopId] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [];
-      return {
-        direction,
-        stop: {
-          ...stopObject(terminalStopId, data.stopsById),
-          borough: metadata?.boroughByStopId.get(stationStopId(terminalStopId)) || null,
-        },
-      };
-    })
-    .filter((item) => item.stop.id);
-}
-
 export function tripsNearCurrentTime(trips, stopTimesByTrip, nowMinute, windowMinutes = 120) {
   return trips.filter((trip) => {
     const firstStop = stopTimesByTrip.get(trip.trip_id)?.[0];

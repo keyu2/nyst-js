@@ -3,7 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import RouteBullet from "../../components/RouteBullet";
-import { hasTransferRouteChange, ROUTE_COLORS } from "../../lib/routes";
+import { hasTransferRouteChange, ROUTE_COLORS, routeFamily } from "../../lib/routes";
+
+const INACTIVE_STRIP_COLOR = "color-mix(in srgb, var(--muted) 48%, var(--background))";
+
+function activeStripColor(routeId) {
+  return `#${ROUTE_COLORS[routeFamily(routeId)] || "808183"}`;
+}
 
 function boroughBoundary(firstStop, secondStop) {
   if (
@@ -76,8 +82,8 @@ export function RouteStopList({
   }
 
   const startBorough = searching ? null : visibleStops[0]?.borough;
-  const stripColor = `#${ROUTE_COLORS[routeId] || "777777"}`;
-  const inactiveColor = "#8a8a8a";
+  const stripColor = activeStripColor(routeId);
+  const inactiveColor = INACTIVE_STRIP_COLOR;
 
   return (
     <div>
@@ -197,7 +203,7 @@ export function BranchOffshoot({
   return (
     <section
       className={`branch-offshoot${connectsAtStart ? "" : " branch-offshoot--terminal-start"}`}
-      style={{ "--branch-color": `#${ROUTE_COLORS[routeId] || "777777"}` }}
+      style={{ "--branch-color": activeStripColor(routeId) }}
     >
       <h2 className="visually-hidden">{branch.name} branch</h2>
       {mergesBack && (

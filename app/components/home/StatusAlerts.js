@@ -53,7 +53,6 @@ export function StatusAlertList({
               key={routes.join("-")}
               style={{ "--route-family-color": family?.color || "#808183" }}
             >
-              <span className="status-alert-family">{family?.name || "Subway"}</span>
               <span className="status-alert-bullets">
                 {routes.map((routeId) => (
                   <RouteBullet key={routeId} routeId={routeId} size={40} />
@@ -80,7 +79,7 @@ export function StatusAlertList({
               className={`new-line-mobile-section new-line-mobile-section--${sectionEntries.length} new-line-mobile-section--${section.layout} status-alert-mobile-section`}
               key={section.families.join("-")}
             >
-              {sectionEntries.map(({ alerts, family, familyIndex, label, routes }) => (
+              {sectionEntries.map(({ alerts, family, label, routes }) => (
                 <button
                   className="new-line-mobile-family status-alert-mobile-family"
                   disabled={!alerts.length}
@@ -88,15 +87,12 @@ export function StatusAlertList({
                   key={routes.join("-")}
                   style={{ "--route-family-color": family?.color || "#808183" }}
                 >
-                  <span className="new-line-mobile-heading">
-                    <strong>{section.labels?.[familyIndex] || family?.name || "Subway"}</strong>
-                    <small className="status-alert-mobile-label">{label}</small>
-                  </span>
                   <span className="new-line-mobile-bullets">
                     {routes.map((routeId) => (
                       <RouteBullet key={routeId} routeId={routeId} size={46} />
                     ))}
                   </span>
+                  <span className="status-alert-mobile-label">{label}</span>
                 </button>
               ))}
             </div>

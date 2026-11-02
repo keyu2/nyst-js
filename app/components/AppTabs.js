@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { House, MapPin, Settings, Star, TriangleAlert } from "lucide-react";
+import { House, Map, MapPin, Settings, Star, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSubwayPreferences } from "../lib/preferences";
 
 const NAV_ITEMS = [
   { id: "subway", label: "Home", href: "/subway", Icon: House },
@@ -13,6 +14,14 @@ const NAV_ITEMS = [
 
 export default function AppTabs({ active, onNavigate }) {
   const router = useRouter();
+  const { mapEnabled } = useSubwayPreferences();
+  const items = mapEnabled
+    ? [
+        ...NAV_ITEMS.slice(0, 3),
+        { id: "map", label: "Map", href: "/map", Icon: Map },
+        NAV_ITEMS[3],
+      ]
+    : NAV_ITEMS;
 
   function navigateTo(href) {
     onNavigate?.();
@@ -25,8 +34,12 @@ export default function AppTabs({ active, onNavigate }) {
         NYST
       </Link>
 
-      <nav className="new-tabs new-tabs--primary" aria-label="Main sections">
-        {NAV_ITEMS.map(({ id, label, href, Icon }) => {
+      <nav
+        className="new-tabs new-tabs--primary"
+        data-item-count={items.length}
+        aria-label="Main sections"
+      >
+        {items.map(({ id, label, href, Icon }) => {
           const isActive = active === id;
 
           return (

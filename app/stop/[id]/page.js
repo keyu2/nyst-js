@@ -6,7 +6,9 @@ import RouteBullet from "../../components/RouteBullet";
 import FavoriteStationButton from "../../components/FavoriteStationButton";
 import StationTrains from "./StationTrains";
 import { getRouteAlerts, getStop } from "../../lib/mta";
+import { getStationMapData } from "../../lib/mta/map";
 import { routeFamily } from "../../lib/routes";
+import StationMap from "./StationMap";
 
 function groupTransfersByName(transfers) {
   const groups = new Map();
@@ -25,7 +27,10 @@ function groupTransfersByName(transfers) {
 export default async function StopPage({ params, searchParams }) {
   const { id } = await params;
   const { route } = await searchParams;
-  const stop = await getStop(id, route);
+  const [stop, stationMapData] = await Promise.all([
+    getStop(id),
+    getStationMapData(id),
+  ]);
 
   const trains = stop.stopTimes || [];
   const alertRouteIds = [...new Set(
@@ -52,6 +57,8 @@ export default async function StopPage({ params, searchParams }) {
     <main className="page-shell stop-page">
       <BackButton href={route ? `/route/${encodeURIComponent(route)}` : "/subway"} />
       <HomeButton />
+
+      {stationMapData && <StationMap {...stationMapData} />}
 
       <div className="stop-page-heading">
         <h1 className="stop-page-title">
@@ -101,7 +108,6 @@ export default async function StopPage({ params, searchParams }) {
         stopId={id}
         now={stop.generatedAt}
         requestedRoute={route}
-        scheduledTermini={stop.scheduledTermini}
         stopBorough={stop.borough}
         sameStationTransfers={sameStationTransfers.flatMap((station) => station.services)}
         alertsByRoute={alertsByRoute}

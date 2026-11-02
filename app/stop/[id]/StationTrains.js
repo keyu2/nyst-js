@@ -17,73 +17,15 @@ import {
   directionGroupLabel,
   disambiguateDirectionGroupLabels,
 } from "../../lib/directionLabels";
+import { realtimeDirectionOptions } from "../../lib/stationDirections";
 
 const EMPTY_LIST = Object.freeze([]);
 const EMPTY_ALERTS = Object.freeze({});
 const REFRESH_INTERVAL = 20_000;
 
-function destinationOptions(directionId, trains) {
-  const destinations = new Map();
-  for (const train of trains) {
-    const destinationId = train?.destination?.id || train?.destination?.name || train?.headsign;
-    const label = train?.destination?.name || train?.headsign;
-    if (!destinationId || !label) continue;
-    const key = `${directionId}:${destinationId}`;
-    const option = destinations.get(key) || {
-      id: key,
-      label,
-      borough: train?.destination?.borough || null,
-      direction: directionId,
-      trains: [],
-    };
-    option.trains.push(train);
-    destinations.set(key, option);
-  }
-  return [...destinations.values()];
-}
-
 function directionKey(option) {
   const direction = option.id.split(":", 1)[0];
   return `${direction}:${option.label.trim().toLocaleLowerCase()}`;
-}
-
-function routeDirectionOptions({
-  activeRoute,
-  northbound,
-  requestedRouteFamily,
-  scheduledTermini,
-  southbound,
-}) {
-  const trainsForRoute = (trains) => trains.filter(
-    (train) => routeFamily(train.trip?.route?.id) === activeRoute
-  );
-  const realtimeOptions = [
-    ...destinationOptions("northbound", trainsForRoute(northbound)),
-    ...destinationOptions("southbound", trainsForRoute(southbound)),
-  ];
-  const options = [...realtimeOptions];
-
-  if (realtimeOptions.length === 0 || activeRoute !== requestedRouteFamily) {
-    return options;
-  }
-
-  for (const terminus of scheduledTermini) {
-    const direction = terminus.direction === "N" ? "northbound" : "southbound";
-    const hasRealtimeService = realtimeOptions.some(
-      (option) => option.direction === direction
-    );
-    if (hasRealtimeService) continue;
-
-    options.push({
-      id: `${direction}:scheduled:${terminus.stop.id}`,
-      label: terminus.stop.name,
-      borough: terminus.stop.borough || null,
-      direction,
-      trains: [],
-    });
-  }
-
-  return options;
 }
 
 function groupDirectionOptions(options, stopBorough) {
@@ -110,7 +52,6 @@ export default function StationTrains({
   stopId,
   now,
   requestedRoute,
-  scheduledTermini = EMPTY_LIST,
   stopBorough,
   sameStationTransfers = EMPTY_LIST,
   alertsByRoute = EMPTY_ALERTS,
@@ -161,20 +102,12 @@ export default function StationTrains({
   }, [router]);
   const activeRoute = familyIds.includes(selectedRoute) ? selectedRoute : familyIds[0] || "";
   const directionOptions = useMemo(
-    () => routeDirectionOptions({
+    () => realtimeDirectionOptions({
       activeRoute,
       northbound,
-      requestedRouteFamily,
-      scheduledTermini,
       southbound,
     }),
-    [
-      activeRoute,
-      northbound,
-      requestedRouteFamily,
-      scheduledTermini,
-      southbound,
-    ]
+    [activeRoute, northbound, southbound]
   );
   const directionGroups = useMemo(
     () => groupDirectionOptions(directionOptions, stopBorough),

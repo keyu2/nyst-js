@@ -16,6 +16,40 @@ import {
   tripOriginStopId,
 } from "./tripPath.js";
 
+const MAX_TRIP_MAP_POINTS = 700;
+
+function stopCoordinates(stopTimes) {
+  return stopTimes
+    .map((stopTime) => [
+      Number(stopTime.stop?.longitude),
+      Number(stopTime.stop?.latitude),
+    ])
+    .filter(([longitude, latitude]) => (
+      Number.isFinite(longitude) && Number.isFinite(latitude)
+    ));
+}
+
+function tripMapCoordinates(data, staticTrip, stopTimes, realtimePathIsAuthoritative) {
+  if (realtimePathIsAuthoritative || !staticTrip?.shape_id) {
+    return stopCoordinates(stopTimes);
+  }
+
+  const shapePoints = data.shapes
+    .filter((point) => point.shape_id === staticTrip.shape_id)
+    .sort((left, right) => (
+      Number(left.shape_pt_sequence) - Number(right.shape_pt_sequence)
+    ));
+  const stride = Math.max(1, Math.ceil(shapePoints.length / MAX_TRIP_MAP_POINTS));
+  const coordinates = shapePoints
+    .filter((_, index) => index % stride === 0 || index === shapePoints.length - 1)
+    .map((point) => [Number(point.shape_pt_lon), Number(point.shape_pt_lat)])
+    .filter(([longitude, latitude]) => (
+      Number.isFinite(longitude) && Number.isFinite(latitude)
+    ));
+
+  return coordinates.length >= 2 ? coordinates : stopCoordinates(stopTimes);
+}
+
 function findStaticTrip(data, update, tripId, routeId, activeServices) {
   const realtimeStopIds = new Set((update.stopTimeUpdate || []).map((item) => item.stopId));
   let matches = data.trips.filter(
@@ -176,6 +210,13 @@ export async function getTrip(requestedRouteId, tripId) {
     ),
   }));
 
+  const mapCoordinates = tripMapCoordinates(
+    data,
+    staticTrip,
+    stopTimes,
+    realtimePathIsAuthoritative
+  );
+
   return {
     id: tripId,
     updatedAt: now,
@@ -184,6 +225,7 @@ export async function getTrip(requestedRouteId, tripId) {
       data.stopsById
     ),
     route: { id: displayRouteId, color: ROUTE_COLORS[routeId] },
+    mapCoordinates,
     stopTimes,
   };
 }

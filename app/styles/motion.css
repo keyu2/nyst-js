@@ -1,13 +1,13 @@
 @media (prefers-reduced-motion: no-preference) {
   .station-route-tabs button,
-  .direction-tabs button,
+  .direction-branch-options button,
   .favorite-station-button,
   .arrival-show-more {
     transition: background-color 180ms ease, color 180ms ease, scale 140ms ease;
   }
 
   .station-route-tabs button:active,
-  .direction-tabs button:active,
+  .direction-branch-options button:active,
   .favorite-station-button:active,
   .arrival-show-more:active { scale: .96; }
 

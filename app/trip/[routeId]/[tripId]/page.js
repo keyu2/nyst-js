@@ -5,6 +5,7 @@ import RouteBullet from "../../../components/RouteBullet";
 import { serviceAlertStatus } from "../../../lib/alertClassification";
 import { getRouteAlerts, getTrip } from "../../../lib/mta";
 import { buildTripProgress } from "../../../lib/tripProgress";
+import TripMap from "./TripMap";
 import TripTimeline from "./TripTimeline";
 
 const ALERT_APPEARANCE = {
@@ -50,6 +51,14 @@ export default async function TripPage({ params, searchParams }) {
     <main className="page-shell trip-page" style={{ "--trip-route-color": routeColor }}>
       <BackButton href={`/route/${routeId}`} />
       <HomeButton />
+
+      <TripMap
+        coordinates={trip.mapCoordinates || []}
+        nextStop={progress.nextStop}
+        routeColor={routeColor}
+        routeId={routeId}
+        stopTimes={stopTimes}
+      />
 
       <div className="trip-header">
         <Link

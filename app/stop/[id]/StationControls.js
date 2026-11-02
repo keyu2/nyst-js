@@ -1,5 +1,6 @@
+import { useRef } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import RouteBullet from "../../components/RouteBullet";
 
 export function StationRouteTabs({
@@ -63,7 +64,13 @@ export function DirectionSelector({
   selectedTerminus,
   terminusKey,
 }) {
+  const branchMenuRef = useRef(null);
   if (!activeDirectionGroup) return null;
+
+  const selectTerminus = (terminus) => {
+    onTerminusChange(terminus);
+    branchMenuRef.current?.removeAttribute("open");
+  };
 
   return (
     <div className="direction-groups">
@@ -95,18 +102,24 @@ export function DirectionSelector({
       </div>
 
       {activeDirectionGroup.options.length > 1 && (
-        <section
-          className="direction-group"
+        <details
+          className="direction-branch-picker"
           aria-label={`${activeDirectionGroup.label} terminal filter`}
+          key={activeDirectionGroup.id}
+          ref={branchMenuRef}
         >
-          <div className="direction-tabs">
+          <summary>
+            <span>{activeTerminus?.label || "All branches"}</span>
+            <ChevronDown aria-hidden="true" />
+          </summary>
+          <div className="direction-branch-options">
             <button
               className={!activeTerminus ? "active" : ""}
               type="button"
               aria-pressed={!activeTerminus}
-              onClick={() => onTerminusChange("")}
+              onClick={() => selectTerminus("")}
             >
-              All
+              All branches
             </button>
 
             {activeDirectionGroup.options.map((option) => {
@@ -119,14 +132,14 @@ export function DirectionSelector({
                   key={option.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => onTerminusChange(optionKey)}
+                  onClick={() => selectTerminus(optionKey)}
                 >
                   {option.label}
                 </button>
               );
             })}
           </div>
-        </section>
+        </details>
       )}
     </div>
   );

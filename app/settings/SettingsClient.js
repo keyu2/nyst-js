@@ -34,6 +34,10 @@ const MOBILE_LINE_LAYOUT_OPTIONS = [
   { value: "grouped", label: "Grouped" },
   { value: "rows", label: "Full rows" },
 ];
+const MAP_OPTIONS = [
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
+];
 
 function SegmentedSetting({ label, value, options, onChange }) {
   const settingId = `${label.toLowerCase().replaceAll(" ", "-")}-setting`;
@@ -68,12 +72,14 @@ export default function SettingsClient() {
     mobileLineLayout,
     stationView,
     boardArrivalInversion,
+    mapEnabled,
     setShowSeconds,
     setTripProgressUnit,
     setLineView,
     setMobileLineLayout,
     setStationView,
     setBoardArrivalInversion,
+    setMapEnabled,
   } = useSubwayPreferences();
   const { theme, setTheme } = useThemePreference();
 
@@ -139,6 +145,13 @@ export default function SettingsClient() {
             value={mobileLineLayout}
             onChange={setMobileLineLayout}
             options={MOBILE_LINE_LAYOUT_OPTIONS}
+          />
+
+          <SegmentedSetting
+            label="Map"
+            value={mapEnabled ? "on" : "off"}
+            onChange={(value) => setMapEnabled(value === "on")}
+            options={MAP_OPTIONS}
           />
         </div>
       </div>

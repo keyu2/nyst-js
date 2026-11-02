@@ -13,8 +13,35 @@ export function distanceMiles(origin, station) {
 
 export function stationRouteIds(station) {
   return [...new Set(
-    station.services.flatMap((service) => service.routes.map(routeFamily))
+    station.services.flatMap((service) => [
+      ...(service.routes || []),
+      ...(service.realtimeRoutes || []),
+    ].map(routeFamily))
   )].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+export function stationActiveRouteIds(station) {
+  const availabilityKnown = station.services.some((service) => (
+    Array.isArray(service.scheduledRoutes) || Array.isArray(service.realtimeRoutes)
+  ));
+  if (!availabilityKnown) return stationRouteIds(station);
+
+  const realtimeRoutes = [...new Set(
+    station.services.flatMap((service) => (
+      service.realtimeRoutes || []
+    ).map(routeFamily))
+  )];
+  const activeRoutes = realtimeRoutes.length
+    ? realtimeRoutes
+    : [...new Set(
+        station.services.flatMap((service) => (
+          service.scheduledRoutes || []
+        ).map(routeFamily))
+      )];
+
+  return activeRoutes.sort((a, b) => (
+    a.localeCompare(b, undefined, { numeric: true })
+  ));
 }
 
 export function nearestStations(stations, origin, limit = 3) {

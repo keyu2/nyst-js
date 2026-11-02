@@ -123,25 +123,12 @@
 .new-line-row {
   display: grid;
   min-width: 0;
-  min-height: 102px;
+  min-height: 78px;
   align-content: center;
-  gap: 11px;
-  padding: 16px 18px;
+  padding: 12px 18px;
   border: 1px solid color-mix(in srgb, var(--route-family-color) 18%, var(--line));
   border-radius: 18px;
   background: color-mix(in srgb, var(--route-family-color) 9%, var(--surface));
-}
-
-.new-line-family {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: .075em;
-  line-height: 1;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .new-line-bullets {
@@ -222,13 +209,17 @@
 .new-station-result > span:first-child { display: grid; gap: 4px; }
 .new-station-result small { color: #747b8c; }
 .new-station-result > span:last-child { display: flex; align-items: center; gap: 5px; }
+.station-route-bullet--inactive {
+  filter: grayscale(1);
+  opacity: .38;
+}
 .new-station-result b { margin-left: 4px; color: #747b8c; font-size: 24px; }
 
 @media (max-width: 520px) {
   .new-status-page { padding-right: 14px; padding-left: 14px; }
   .new-tabs button { height: 70px; }
   .new-line-list { grid-template-columns: 1fr; gap: 9px; padding: 9px; }
-  .new-line-row { min-height: 84px; gap: 8px; padding: 13px 14px; border-radius: 15px; }
+  .new-line-row { min-height: 72px; padding: 10px 14px; border-radius: 15px; }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -657,19 +648,6 @@
   border-bottom: 1px solid #444;
 }
 
-.direction-group-title {
-  margin: 0 0 8px;
-  color: inherit;
-  font-size: 17px;
-  font-weight: 750;
-}
-
-.direction-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .direction-slider {
   display: grid;
   grid-auto-columns: minmax(0, 1fr);
@@ -700,21 +678,60 @@
   color: var(--background);
 }
 
-.direction-tabs button {
+.direction-branch-picker {
+  width: min(100%, 520px);
+}
+
+.direction-branch-picker summary {
+  display: flex;
   min-height: 52px;
-  padding: 10px 16px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 18px;
   border: 1px solid #888;
   border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.direction-branch-picker summary::-webkit-details-marker { display: none; }
+
+.direction-branch-picker summary svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.direction-branch-picker[open] summary svg { transform: rotate(180deg); }
+
+.direction-branch-options {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 7px;
+  border: 1px solid #666;
+  border-radius: 18px;
+}
+
+.direction-branch-options button {
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
   background: transparent;
   color: inherit;
   font: inherit;
   font-weight: 600;
+  text-align: left;
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease;
 }
 
-.direction-tabs button.active {
-  border: 2px solid currentColor;
+.direction-branch-options button.active {
   background: var(--foreground);
   color: var(--background);
   font-weight: 700;
@@ -741,6 +758,34 @@
   margin: 0 auto;
   padding: 30px 24px 60px;
 }
+
+.trip-map-panel {
+  position: relative;
+  height: 360px;
+  overflow: hidden;
+  margin: 4px 0 26px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: #08090b;
+}
+
+.trip-map-panel__canvas { position: absolute; inset: 0; }
+
+.trip-map-panel__loading {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 76%);
+  color: white;
+  font-size: 12px;
+  font-weight: 750;
+  transform: translateX(-50%);
+}
+
+.trip-map-panel .maplibregl-ctrl-attrib { background: rgb(0 0 0 / 62%); color: #d6d6d6; }
+.trip-map-panel .maplibregl-ctrl-attrib a { color: white; }
 
 .trip-header {
   display: flex;
@@ -929,6 +974,7 @@
   .trip-train-icon { width: 32px; height: 32px; flex-basis: 32px; }
   .trip-between-control { grid-template-columns: 52px 24px minmax(0, auto) 18px; font-size: 13px; }
   .trip-stops-away { width: 100%; font-size: 13px; }
+  .trip-map-panel { height: 310px; margin-bottom: 22px; border-radius: 14px; }
 }
 
 /* Loading and interaction feedback */
@@ -1206,11 +1252,12 @@
     padding: 7px 6px 7px 48px !important;
   }
 
-  .branch-tabs button,
-  .direction-tabs button {
+  .branch-tabs button {
     padding: 9px 12px !important;
     line-height: 1.2;
   }
+
+  .direction-branch-picker { width: 100%; }
 
   .stop-page-title {
     padding-right: 0;

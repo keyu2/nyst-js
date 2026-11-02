@@ -17,6 +17,7 @@ const DEFAULT_PREFERENCES = Object.freeze({
   mobileLineLayout: "grouped",
   stationView: "standard",
   boardArrivalInversion: true,
+  mapEnabled: false,
 });
 
 let cachedValue = null;
@@ -30,6 +31,7 @@ function normalizePreferences(value) {
     mobileLineLayout: value?.mobileLineLayout === "rows" ? "rows" : "grouped",
     stationView: value?.stationView === "board" ? "board" : "standard",
     boardArrivalInversion: value?.boardArrivalInversion !== false,
+    mapEnabled: value?.mapEnabled === true,
   };
 }
 
@@ -66,5 +68,6 @@ export function useSubwayPreferences() {
     setMobileLineLayout: (mobileLineLayout) => updatePreferences({ mobileLineLayout }),
     setStationView: (stationView) => updatePreferences({ stationView }),
     setBoardArrivalInversion: (boardArrivalInversion) => updatePreferences({ boardArrivalInversion }),
+    setMapEnabled: (mapEnabled) => updatePreferences({ mapEnabled }),
   };
 }

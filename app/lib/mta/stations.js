@@ -2,9 +2,33 @@ import { normalizeRouteId } from "../routes.js";
 import { STATION_COMPLEX_STOP_IDS } from "../stationComplexes.js";
 import { unixSeconds } from "../time.js";
 import { getRealtime, getStatic } from "./feeds.js";
+import { activeServiceIds, realtimeRouteIdsByStop } from "./helpers.js";
 import { stationStopId } from "./stopIds.js";
 
 let stationComplexCache;
+
+export function buildScheduledRouteIdsByStop(trips, stopTimesByTrip, activeServices) {
+  const routesByStop = new Map();
+
+  for (const trip of trips) {
+    if (!activeServices.has(trip.service_id)) continue;
+    const routeId = normalizeRouteId(trip.route_id);
+    if (!routeId) continue;
+
+    const visitedStops = new Set(
+      (stopTimesByTrip.get(trip.trip_id) || [])
+        .map((stopTime) => stationStopId(stopTime.stop_id))
+        .filter(Boolean)
+    );
+    for (const stopId of visitedStops) {
+      const routes = routesByStop.get(stopId) || new Set();
+      routes.add(routeId);
+      routesByStop.set(stopId, routes);
+    }
+  }
+
+  return routesByStop;
+}
 
 function stationIdFor(stopId, data, stationsById) {
   const baseId = stationStopId(stopId);
@@ -62,8 +86,26 @@ export async function getRouteServiceAvailability(requestedRouteId) {
 }
 
 export async function getStations() {
-  const data = await getStatic();
-  if (stationComplexCache?.source === data) return stationComplexCache.value;
+  const [data, realtimeEntities] = await Promise.all([
+    getStatic(),
+    getRealtime().catch(() => []),
+  ]);
+  if (
+    stationComplexCache?.source === data &&
+    stationComplexCache.realtimeSource === realtimeEntities
+  ) {
+    return stationComplexCache.value;
+  }
+
+  const scheduledRoutesByStop = buildScheduledRouteIdsByStop(
+    data.trips,
+    data.stopTimesByTrip,
+    activeServiceIds(data)
+  );
+  const realtimeRoutesByStop = realtimeRouteIdsByStop(
+    realtimeEntities,
+    Math.floor(Date.now() / 1000)
+  );
 
   const stations = [...data.stopsById.values()]
     .filter((stop) => stop.location_type === "1")
@@ -117,11 +159,18 @@ export async function getStations() {
         name,
         latitude: members.reduce((sum, station) => sum + station.latitude, 0) / members.length,
         longitude: members.reduce((sum, station) => sum + station.longitude, 0) / members.length,
-        services: members.map(({ id, routes }) => ({ id, routes })),
+        services: members.map(({ id, routes }) => ({
+          id,
+          routes,
+          scheduledRoutes: [...(scheduledRoutesByStop.get(id) || [])]
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+          realtimeRoutes: [...(realtimeRoutesByStop.get(id) || [])]
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+        })),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-  stationComplexCache = { source: data, value };
+  stationComplexCache = { source: data, realtimeSource: realtimeEntities, value };
   return value;
 }

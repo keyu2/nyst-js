@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronRight, Star } from "lucide-react";
 import { useMemo } from "react";
 import RouteBullet from "../RouteBullet";
-import { stationRouteIds } from "../../lib/stationDiscovery";
+import { stationActiveRouteIds, stationRouteIds } from "../../lib/stationDiscovery";
 import { useSubwayPreferences } from "../../lib/preferences";
 import { MOBILE_LINE_SECTIONS, ROUTE_FAMILIES, ROUTE_STATUS } from "./config";
 
@@ -29,6 +29,7 @@ function RouteButtons({ group, available, routeStatuses, size = 40 }) {
 
 export function StationItem({ station, distance, preferredStopId, preferredRoute }) {
   const routes = stationRouteIds(station);
+  const activeRoutes = new Set(stationActiveRouteIds(station));
   const primaryService = station.services.find((service) => service.id === preferredStopId)
     || station.services[0];
   if (!primaryService) return null;
@@ -51,7 +52,16 @@ export function StationItem({ station, distance, preferredStopId, preferredRoute
       </span>
       <span>
         {routes.map((id) => (
-          <RouteBullet key={id} routeId={id} size={25} />
+          <RouteBullet
+            className={activeRoutes.has(id) ? undefined : "station-route-bullet--inactive"}
+            key={id}
+            routeId={id}
+            size={25}
+            alt={activeRoutes.has(id)
+              ? `${id} train`
+              : `${id} train, no service right now`}
+            title={activeRoutes.has(id) ? undefined : "No service right now"}
+          />
         ))}
         <ChevronRight aria-hidden="true" />
       </span>
@@ -79,7 +89,6 @@ export function LineList({ groups, available, routeStatuses }) {
               key={group.join("-")}
               style={{ "--route-family-color": family?.color || "#808183" }}
             >
-              <span className="new-line-family">{family?.name || "Subway"}</span>
               <div className="new-line-bullets">
                 <RouteButtons
                   group={group}
@@ -101,7 +110,6 @@ export function LineList({ groups, available, routeStatuses }) {
             family: ROUTE_FAMILIES[familyIndex],
             familyIndex,
             group: groups[familyIndex] || [],
-            label: section.labels?.[familyIndex] || ROUTE_FAMILIES[familyIndex]?.name,
           }));
           const familyCount = sectionGroups.length;
 
@@ -110,15 +118,12 @@ export function LineList({ groups, available, routeStatuses }) {
               className={`new-line-mobile-section new-line-mobile-section--${familyCount} new-line-mobile-section--${section.layout || "standard"}`}
               key={section.families.join("-")}
             >
-              {sectionGroups.map(({ family, group, label }) => (
+              {sectionGroups.map(({ family, group }) => (
                 <div
                   className="new-line-mobile-family"
                   key={group.join("-") || family?.name}
                   style={{ "--route-family-color": family?.color || "#808183" }}
                 >
-                  <span className="new-line-mobile-heading">
-                    <strong>{label || "Subway"}</strong>
-                  </span>
                   <span className="new-line-mobile-bullets">
                     <RouteButtons
                       group={group}
