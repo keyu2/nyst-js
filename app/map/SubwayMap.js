@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { LocateFixed, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import AppTabs from "../components/AppTabs";
 import RouteBullet from "../components/RouteBullet";
 import { useSubwayPreferences } from "../lib/preferences";
-import { createSubwayMap, selectSubwayMapStation } from "../lib/subwayMapClient";
+import {
+  createSubwayMap,
+  selectSubwayMapStation,
+  updateSubwayMapData,
+} from "../lib/subwayMapClient";
 
 function stationHref(station, routeId) {
   const service = station.services.find(({ routeIds }) => routeIds.includes(routeId))
@@ -47,10 +52,12 @@ function StationSheet({ station, onClose }) {
   );
 }
 
-export default function SubwayMap({ lines, stations }) {
+export default function SubwayMap({ lines, stations, vehicles = [] }) {
   const { mapEnabled } = useSubwayPreferences();
+  const router = useRouter();
   const mapContainer = useRef(null);
   const mapInstance = useRef(null);
+  const latestMapData = useRef({ lines, stations, vehicles });
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState("");
   const [selectedStationId, setSelectedStationId] = useState(null);
@@ -61,21 +68,32 @@ export default function SubwayMap({ lines, stations }) {
   const selectedStation = stationsById.get(selectedStationId);
 
   useEffect(() => {
+    latestMapData.current = { lines, stations, vehicles };
+  }, [lines, stations, vehicles]);
+
+  useEffect(() => {
     if (!mapEnabled || !mapContainer.current) return undefined;
     let cancelled = false;
     let map;
 
     async function initializeMap() {
       try {
+        const initialData = latestMapData.current;
         map = await createSubwayMap({
           container: mapContainer.current,
           center: [-73.94, 40.72],
           zoom: 10.3,
-          lines,
-          stations,
+          lineCasing: false,
+          lines: initialData.lines,
+          showStationLabels: true,
+          stations: initialData.stations,
+          vehicles: initialData.vehicles,
           onStationSelect: (stationId, activeMap) => {
             setSelectedStationId(stationId);
             selectSubwayMapStation(activeMap, stationId);
+          },
+          onVehicleSelect: ({ id, routeId }) => {
+            router.push(`/trip/${encodeURIComponent(routeId)}/${encodeURIComponent(id)}`);
           },
         });
         if (cancelled) {
@@ -96,7 +114,18 @@ export default function SubwayMap({ lines, stations }) {
       mapInstance.current = null;
       map?.remove();
     };
-  }, [lines, mapEnabled, stations]);
+  }, [mapEnabled, router]);
+
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    updateSubwayMapData(mapInstance.current, { lines, stations, vehicles });
+  }, [lines, mapReady, stations, vehicles]);
+
+  useEffect(() => {
+    if (!mapEnabled) return undefined;
+    const timer = window.setInterval(() => router.refresh(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [mapEnabled, router]);
 
   function clearSelection() {
     setSelectedStationId(null);

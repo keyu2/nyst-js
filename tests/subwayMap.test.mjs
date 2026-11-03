@@ -6,6 +6,8 @@ import {
   buildRouteLineFeatures,
   snapVehiclesToLines,
   smoothLineCoordinates,
+  mergeMapCorridors,
+  buildCurrentRouteLines,
 } from "../app/lib/mta/map.js";
 
 const shapes = [
@@ -14,6 +16,33 @@ const shapes = [
   { shape_id: "weekend-a", shape_pt_sequence: "1", shape_pt_lon: "-73.8", shape_pt_lat: "40.6" },
   { shape_id: "weekend-a", shape_pt_sequence: "2", shape_pt_lon: "-73.7", shape_pt_lat: "40.7" },
 ];
+
+test("the map omits services with no future realtime trains", () => {
+  const trip = { trip_id: "live-e", route_id: "E", shape_id: "weekday-a" };
+  const data = { trips: [trip, { trip_id: "m", route_id: "M", shape_id: "weekday-a" }], shapes, tripsByRealtimeId: new Map([["live-e",trip]]) };
+  const entities = [{tripUpdate:{trip:{tripId:"live-e",routeId:"E"},stopTimeUpdate:[{arrival:{time:200}}]}},{tripUpdate:{trip:{tripId:"m",routeId:"M"},stopTimeUpdate:[{arrival:{time:100}}]}}];
+  assert.deepEqual(buildCurrentRouteLines(data,entities,150).map((line)=>line.properties.routeId),["E"]);
+  assert.deepEqual(buildCurrentRouteLines(data,entities,250),[]);
+});
+
+test("opposite track shapes share one corridor despite platform offsets", () => {
+  const feature = (color, coordinates) => ({ type: "Feature", properties: { color, offset: 4 }, geometry: { type: "LineString", coordinates } });
+  const features = mergeMapCorridors([
+    feature("#00933C", [[-74, 40.7], [-73.99, 40.71], [-73.98, 40.72]]),
+    feature("#00933C", [[-73.9801, 40.7201], [-73.9901, 40.7101], [-74.0001, 40.7001]]),
+    feature("#FF6319", [[-73.98, 40.72], [-73.99, 40.71], [-74, 40.7]]),
+  ]);
+  assert.equal(features.length, 2);
+  assert.deepEqual(features[1].geometry.coordinates[0], [-74, 40.7]);
+});
+
+test("corridor merging preserves different paths between the same terminals", () => {
+  const feature = (coordinates) => ({ properties: { color: "#0039A6" }, geometry: { type: "LineString", coordinates } });
+  assert.equal(mergeMapCorridors([
+    feature([[-74, 40.7], [-73.99, 40.71], [-73.98, 40.72]]),
+    feature([[-74, 40.7], [-73.98, 40.70], [-73.98, 40.72]]),
+  ]).length, 2);
+});
 
 test("map lines follow services running today and preserve shape order", () => {
   const trips = [
@@ -41,6 +70,36 @@ test("map lines collapse express variants into the public route family", () => {
   assert.equal(features[0].properties.color, "#B933AD");
 });
 
+test("map lines collapse opposite directions with the same terminals", () => {
+  const routeShapes = [
+    { shape_id: "north", shape_pt_sequence: "1", shape_pt_lon: "-74.0", shape_pt_lat: "40.7" },
+    { shape_id: "north", shape_pt_sequence: "2", shape_pt_lon: "-73.9", shape_pt_lat: "40.8" },
+    { shape_id: "south", shape_pt_sequence: "1", shape_pt_lon: "-73.9", shape_pt_lat: "40.8" },
+    { shape_id: "south", shape_pt_sequence: "2", shape_pt_lon: "-74.0", shape_pt_lat: "40.7" },
+  ];
+  const features = buildRouteLineFeatures([
+    { route_id: "F", service_id: "weekday", shape_id: "north" },
+    { route_id: "F", service_id: "weekday", shape_id: "south" },
+  ], routeShapes);
+
+  assert.equal(features.length, 1);
+});
+
+test("map lines keep branches with different terminals", () => {
+  const routeShapes = [
+    { shape_id: "main", shape_pt_sequence: "1", shape_pt_lon: "-74.0", shape_pt_lat: "40.7" },
+    { shape_id: "main", shape_pt_sequence: "2", shape_pt_lon: "-73.9", shape_pt_lat: "40.8" },
+    { shape_id: "branch", shape_pt_sequence: "1", shape_pt_lon: "-74.0", shape_pt_lat: "40.7" },
+    { shape_id: "branch", shape_pt_sequence: "2", shape_pt_lon: "-73.8", shape_pt_lat: "40.9" },
+  ];
+  const features = buildRouteLineFeatures([
+    { route_id: "A", service_id: "weekday", shape_id: "main" },
+    { route_id: "A", service_id: "weekday", shape_id: "branch" },
+  ], routeShapes);
+
+  assert.equal(features.length, 2);
+});
+
 test("shared track colors receive separate line offsets", () => {
   const trips = [
     { route_id: "N", service_id: "weekday", shape_id: "weekday-a" },
@@ -51,6 +110,14 @@ test("shared track colors receive separate line offsets", () => {
   const purple = features.find((feature) => feature.properties.routeId === "7");
 
   assert.notEqual(yellow.properties.offset, purple.properties.offset);
+});
+
+test("blue yellow and orange remain visible side by side", () => {
+  const features = buildRouteLineFeatures(["E", "R", "F"].map((route_id) => ({ route_id, shape_id: "weekday-a" })), shapes);
+  const offsets = features.map((feature) => feature.properties.offset);
+  assert.deepEqual(offsets, [-8, 0, 8]);
+  assert.ok(offsets[1] - offsets[0] > 5);
+  assert.ok(offsets[2] - offsets[1] > 5);
 });
 
 test("station maps draw one realtime line per service", () => {
@@ -77,7 +144,7 @@ test("station maps draw one realtime line per service", () => {
   assert.notEqual(features[0].properties.offset, features[1].properties.offset);
 });
 
-test("station maps merge services that use the same route color", () => {
+test("station maps keep separate services that use the same route color", () => {
   const stopsById = new Map([
     ["A01N", { stop_lon: "-74.0", stop_lat: "40.70" }],
     ["A02N", { stop_lon: "-73.99", stop_lat: "40.71" }],
@@ -96,13 +163,13 @@ test("station maps merge services that use the same route color", () => {
     new Set(["A02"])
   );
 
-  assert.equal(features.length, 1);
+  assert.equal(features.length, 2);
   assert.equal(features[0].properties.color, "#0039A6");
-  assert.equal(features[0].properties.routeId, "C,E");
+  assert.deepEqual(features.map((feature)=>feature.properties.routeId), ["C","E"]);
   assert.equal(features[0].geometry.type, "LineString");
 });
 
-test("same-color services share one representative corridor line", () => {
+test("same-color services retain their individual branches", () => {
   const stopsById = new Map([
     ["A01N", { stop_lon: "-74.0", stop_lat: "40.70" }],
     ["A02N", { stop_lon: "-73.99", stop_lat: "40.71" }],
@@ -122,8 +189,8 @@ test("same-color services share one representative corridor line", () => {
     new Set(["A02"])
   );
 
-  assert.equal(features.length, 1);
-  assert.deepEqual(features[0].properties.routeId, "C,E");
+  assert.equal(features.length, 2);
+  assert.deepEqual(features.map((feature)=>feature.properties.routeId), ["C","E"]);
   const [longitude, latitude] = features[0].geometry.coordinates.at(-1);
   assert.ok(Math.abs(longitude - (-73.98)) < 1e-9);
   assert.ok(Math.abs(latitude - 40.72) < 1e-9);
@@ -186,6 +253,35 @@ test("station maps interpolate realtime train positions between stops", () => {
   assert.ok(Math.abs(vehicles[0].latitude - 40.71) < 1e-9);
   assert.ok(vehicles[0].directionBearing > 30);
   assert.ok(vehicles[0].directionBearing < 50);
+});
+
+test("station maps prefer a reported vehicle position over interpolation", () => {
+  const stopsById = new Map([
+    ["A01N", { stop_lon: "-74.0", stop_lat: "40.70" }],
+    ["A02N", { stop_lon: "-73.98", stop_lat: "40.72" }],
+  ]);
+  const vehicles = buildRealtimeStationVehicles([
+    {
+      tripUpdate: {
+        trip: { routeId: "F", tripId: "f-live" },
+        stopTimeUpdate: [
+          { stopId: "A01N", arrival: { time: 100 } },
+          { stopId: "A02N", arrival: { time: 200 } },
+        ],
+      },
+    },
+    {
+      vehicle: {
+        trip: { routeId: "F", tripId: "f-live" },
+        position: { longitude: -73.985, latitude: 40.715, bearing: 75 },
+      },
+    },
+  ], stopsById, ["F"], 150);
+
+  assert.equal(vehicles.length, 1);
+  assert.equal(vehicles[0].longitude, -73.985);
+  assert.equal(vehicles[0].latitude, 40.715);
+  assert.equal(vehicles[0].directionBearing, 75);
 });
 
 test("realtime station paths are smoothed while keeping station coordinates", () => {

@@ -58,6 +58,7 @@ export default async function TripPage({ params, searchParams }) {
         routeColor={routeColor}
         routeId={routeId}
         stopTimes={stopTimes}
+        vehicle={trip.vehicle}
       />
 
       <div className="trip-header">

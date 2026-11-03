@@ -15,6 +15,7 @@ import {
   trimStaticPathToRealtimeTerminal,
   tripOriginStopId,
 } from "./tripPath.js";
+import { buildRealtimeStationVehicles, snapVehiclesToLines } from "./map.js";
 
 const MAX_TRIP_MAP_POINTS = 700;
 
@@ -48,6 +49,22 @@ function tripMapCoordinates(data, staticTrip, stopTimes, realtimePathIsAuthorita
     ));
 
   return coordinates.length >= 2 ? coordinates : stopCoordinates(stopTimes);
+}
+
+function reportedTripVehicle(entities, tripId, routeId, color) {
+  const vehicle = entities.find((item) => item.vehicle?.trip?.tripId === tripId)?.vehicle;
+  const longitude = Number(vehicle?.position?.longitude);
+  const latitude = Number(vehicle?.position?.latitude);
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
+  const directionBearing = Number(vehicle.position.bearing);
+  return {
+    id: tripId,
+    routeId,
+    color,
+    longitude,
+    latitude,
+    directionBearing: Number.isFinite(directionBearing) ? directionBearing : 0,
+  };
 }
 
 function findStaticTrip(data, update, tripId, routeId, activeServices) {
@@ -216,6 +233,27 @@ export async function getTrip(requestedRouteId, tripId) {
     stopTimes,
     realtimePathIsAuthoritative
   );
+  const routeColor = `#${ROUTE_COLORS[routeId] || "808183"}`;
+  const reportedVehicle = reportedTripVehicle(
+    entities,
+    tripId,
+    displayRouteId,
+    routeColor
+  );
+  const vehicle = snapVehiclesToLines(
+    reportedVehicle
+      ? [reportedVehicle]
+      : buildRealtimeStationVehicles([entity], data.stopsById, [displayRouteId], now),
+    mapCoordinates.length >= 2 ? [{
+      type: "Feature",
+      properties: {
+        color: routeColor,
+        offset: 0,
+        routeId: displayRouteId,
+      },
+      geometry: { type: "LineString", coordinates: mapCoordinates },
+    }] : []
+  )[0] || null;
 
   return {
     id: tripId,
@@ -226,6 +264,7 @@ export async function getTrip(requestedRouteId, tripId) {
     ),
     route: { id: displayRouteId, color: ROUTE_COLORS[routeId] },
     mapCoordinates,
+    vehicle,
     stopTimes,
   };
 }

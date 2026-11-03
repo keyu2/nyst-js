@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSubwayPreferences } from "../../lib/preferences";
 import { createSubwayMap, updateSubwayMapData } from "../../lib/subwayMapClient";
 
 export default function StationMap({ lines, station, vehicles = [] }) {
   const { mapEnabled, stationView } = useSubwayPreferences();
+  const router = useRouter();
   const mapContainer = useRef(null);
   const mapInstance = useRef(null);
   const latestMapData = useRef({ lines, station, vehicles });
@@ -32,6 +34,11 @@ export default function StationMap({ lines, station, vehicles = [] }) {
           controls: false,
           lineCasing: false,
           lines: initialData.lines,
+          onVehicleSelect: ({ id, routeId }) => {
+            router.push(
+              `/trip/${encodeURIComponent(routeId)}/${encodeURIComponent(id)}?from=${encodeURIComponent(initialData.station.id)}`
+            );
+          },
           selectedStationId: initialData.station.id,
           stations: [initialData.station],
           vehicles: initialData.vehicles,
@@ -55,7 +62,7 @@ export default function StationMap({ lines, station, vehicles = [] }) {
       mapInstance.current = null;
       map?.remove();
     };
-  }, [mapEnabled, station.id, station.latitude, station.longitude, station.name, stationView]);
+  }, [mapEnabled, router, station.id, station.latitude, station.longitude, station.name, stationView]);
 
   useEffect(() => {
     if (!mapInstance.current) return;
@@ -64,7 +71,13 @@ export default function StationMap({ lines, station, vehicles = [] }) {
       stations: [station],
       vehicles,
     });
-  }, [lines, station, vehicles]);
+  }, [lines, mapReady, station, vehicles]);
+
+  useEffect(() => {
+    if (!mapEnabled || stationView === "board") return undefined;
+    const timer = window.setInterval(() => router.refresh(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [mapEnabled, router, stationView]);
 
   if (!mapEnabled || stationView === "board") return null;
 

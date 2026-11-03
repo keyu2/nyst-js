@@ -39,10 +39,10 @@ const MAP_OPTIONS = [
   { value: "off", label: "Off" },
 ];
 
-function SegmentedSetting({ label, value, options, onChange }) {
+function SegmentedSetting({ className = "", label, value, options, onChange }) {
   const settingId = `${label.toLowerCase().replaceAll(" ", "-")}-setting`;
   return (
-    <section className="settings-row" aria-labelledby={settingId}>
+    <section className={`settings-row${className ? ` ${className}` : ""}`} aria-labelledby={settingId}>
       <div className="settings-row__copy">
         <h2 id={settingId}>{label}</h2>
       </div>
@@ -141,6 +141,7 @@ export default function SettingsClient() {
           />
 
           <SegmentedSetting
+            className="settings-row--mobile-only"
             label="Mobile line layout"
             value={mobileLineLayout}
             onChange={setMobileLineLayout}

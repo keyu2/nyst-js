@@ -534,6 +534,8 @@
   padding: 24px;
 }
 
+.settings-row--mobile-only { display: none; }
+
 .settings-row + .settings-preview,
 .settings-preview + .settings-row,
 .settings-row + .settings-row {
@@ -820,6 +822,7 @@
   }
 
   .settings-row { grid-template-columns: 1fr; gap: 16px; padding: 20px 16px; }
+  .settings-row--mobile-only { display: grid; }
   .settings-preview { padding: 14px 16px; }
   .focused-line-browser { padding: 20px 16px; }
   .focused-line-browser--route { padding: 0; }

@@ -1,4 +1,5 @@
 import { getBullet } from "./routes.js";
+import { layoutMapCorridors, placeMapVehicles } from "./mapCorridors.js";
 
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
 const DIRECTION_ARROW_IMAGE = "subway-vehicle-direction-arrow";
@@ -11,12 +12,17 @@ export async function createSubwayMap({
   lineCasing = true,
   lines,
   onStationSelect,
+  onVehicleSelect,
   selectedStationId = "",
+  showStationLabels = false,
+  stationLabelOverlap = false,
   stations,
   vehicles = [],
   zoom,
 }) {
   const maplibreModule = await import("maplibre-gl");
+  lines = layoutMapCorridors(lines);
+  vehicles = placeMapVehicles(vehicles, lines);
   const maplibregl = maplibreModule.default || maplibreModule;
   maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
 
@@ -135,6 +141,20 @@ export async function createSubwayMap({
     });
   });
 
+  if (onVehicleSelect) {
+    const selectVehicle = (event) => {
+      const properties = event.features?.[0]?.properties;
+      if (properties?.id && properties?.routeId) {
+        onVehicleSelect(properties, map);
+      }
+    };
+    for (const layer of ["subway-vehicle-directions", "subway-vehicles"]) {
+      map.on("click", layer, selectVehicle);
+      map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
+    }
+  }
+
   const stationFeatures = stations.map((station) => ({
     type: "Feature",
     properties: { id: station.id, name: station.name },
@@ -170,20 +190,45 @@ export async function createSubwayMap({
       "circle-stroke-width": 3,
     },
   });
+  if (showStationLabels) {
+    map.addLayer({
+      id: "subway-station-labels",
+      type: "symbol",
+      source: "subway-stations",
+      layout: {
+        "text-field": ["get", "name"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 9, 10, 15, 14],
+        "text-variable-anchor": ["top", "bottom", "left", "right"],
+        "text-radial-offset": 0.8,
+        "text-justify": "auto",
+        "text-allow-overlap": stationLabelOverlap,
+        "text-ignore-placement": stationLabelOverlap,
+        "text-optional": true,
+      },
+      paint: {
+        "text-color": "#ffffff",
+        "text-halo-color": "#000000",
+        "text-halo-width": 2,
+        "text-halo-blur": 0.5,
+      },
+    });
+  }
   map.moveLayer("subway-vehicle-directions");
   map.moveLayer("subway-vehicles");
 
   if (onStationSelect) {
-    map.on("click", "subway-stations", (event) => {
+    const selectStation = (event) => {
       const stationId = event.features?.[0]?.properties?.id;
       if (stationId) onStationSelect(stationId, map);
-    });
-    map.on("mouseenter", "subway-stations", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "subway-stations", () => {
-      map.getCanvas().style.cursor = "";
-    });
+    };
+    const interactiveLayers = ["subway-stations"];
+    if (showStationLabels) interactiveLayers.push("subway-station-labels");
+    for (const layer of interactiveLayers) {
+      map.on("click", layer, selectStation);
+      map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
+    }
   }
 
   return map;
@@ -263,6 +308,7 @@ function vehicleFeatures(map, vehicles) {
     properties: {
       id: vehicle.id,
       icon: vehicleIconName(vehicle),
+      routeId: vehicle.routeId,
       directionBearing: Number.isFinite(vehicle.directionBearing)
         ? vehicle.directionBearing
         : 0,
@@ -286,6 +332,8 @@ function vehicleFeatures(map, vehicles) {
 }
 
 export async function updateSubwayMapData(map, { lines, stations, vehicles = [] }) {
+  lines = layoutMapCorridors(lines);
+  vehicles = placeMapVehicles(vehicles, lines);
   map?.getSource("subway-lines")?.setData({
     type: "FeatureCollection",
     features: lines,

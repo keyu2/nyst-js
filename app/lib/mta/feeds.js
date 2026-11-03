@@ -217,15 +217,19 @@ async function loadRealtime() {
   if (!entities.length) throw new Error("All MTA realtime feeds failed");
 
   const preferredByTrip = new Map();
+  const vehicleByTrip = new Map();
   for (const entity of entities) {
     const tripId = entity.tripUpdate?.trip?.tripId;
-    if (!tripId) continue;
-    const current = preferredByTrip.get(tripId);
-    const stopCount = entity.tripUpdate.stopTimeUpdate?.length || 0;
-    const currentStopCount = current?.tripUpdate?.stopTimeUpdate?.length || 0;
-    if (!current || stopCount > currentStopCount) preferredByTrip.set(tripId, entity);
+    if (tripId) {
+      const current = preferredByTrip.get(tripId);
+      const stopCount = entity.tripUpdate.stopTimeUpdate?.length || 0;
+      const currentStopCount = current?.tripUpdate?.stopTimeUpdate?.length || 0;
+      if (!current || stopCount > currentStopCount) preferredByTrip.set(tripId, entity);
+    }
+    const vehicleTripId = entity.vehicle?.trip?.tripId;
+    if (vehicleTripId) vehicleByTrip.set(vehicleTripId, entity);
   }
-  return [...preferredByTrip.values()];
+  return [...preferredByTrip.values(), ...vehicleByTrip.values()];
 }
 
 export async function getAlertsFeed() {

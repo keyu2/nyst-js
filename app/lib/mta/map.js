@@ -9,15 +9,15 @@ import { tripLookupId } from "./stopIds.js";
 const MAX_SHAPES_PER_ROUTE = 6;
 const MAX_POINTS_PER_SHAPE = 500;
 const COLOR_OFFSETS = {
-  "0039A6": -6,
-  "FF6319": -4.5,
-  "6CBE45": -3,
-  "996633": -1.5,
-  "A7A9AC": 0,
-  "FCCC0A": 1.5,
-  "EE352E": 3,
-  "00933C": 4.5,
-  "B933AD": 6,
+  "0039A6": -8,
+  "FCCC0A": 0,
+  "FF6319": 8,
+  "6CBE45": -16,
+  "996633": 16,
+  "A7A9AC": 24,
+  "EE352E": -24,
+  "00933C": 32,
+  "B933AD": -32,
 };
 
 function compactCoordinates(points) {
@@ -30,6 +30,49 @@ function compactCoordinates(points) {
     ));
 
   return coordinates.length >= 2 ? coordinates : [];
+}
+
+function shapeTerminalKey(points) {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last) return "";
+  const endpoint = (point) => (
+    `${Number(point.shape_pt_lon).toFixed(4)},${Number(point.shape_pt_lat).toFixed(4)}`
+  );
+  return [endpoint(first), endpoint(last)].sort().join("|");
+}
+
+export function mergeMapCorridors(features) {
+  const result = [];
+  const distance = (a, b) => Math.hypot(
+    (a[0] - b[0]) * Math.cos(a[1] * Math.PI / 180), a[1] - b[1]
+  ) * 111_320;
+  for (const feature of features) {
+    let coordinates = feature.geometry.coordinates;
+    const first = coordinates[0];
+    const last = coordinates.at(-1);
+    if (first[0] > last[0] || (first[0] === last[0] && first[1] > last[1])) {
+      coordinates = [...coordinates].reverse();
+    }
+    const duplicate = result.some((existing) => {
+      if (existing.properties.routeId !== feature.properties.routeId || existing.properties.color !== feature.properties.color) return false;
+      const path = existing.geometry.coordinates;
+      if (distance(path[0], coordinates[0]) > 200 || distance(path.at(-1), coordinates.at(-1)) > 200) return false;
+      return coordinates.every((point) => path.slice(1).some((end, index) => {
+        const start = path[index];
+        const scale = Math.cos(point[1] * Math.PI / 180);
+        const dx = (end[0] - start[0]) * scale;
+        const dy = end[1] - start[1];
+        const length = dx * dx + dy * dy;
+        const fraction = length ? Math.max(0, Math.min(1,
+          ((point[0] - start[0]) * scale * dx + (point[1] - start[1]) * dy) / length
+        )) : 0;
+        return distance(point, [start[0] + (end[0] - start[0]) * fraction, start[1] + dy * fraction]) <= 60;
+      }));
+    });
+    if (!duplicate) result.push({ ...feature, geometry: { ...feature.geometry, coordinates } });
+  }
+  return result;
 }
 
 export function buildRouteLineFeatures(trips, shapes, serviceIds = null) {
@@ -59,10 +102,16 @@ export function buildRouteLineFeatures(trips, shapes, serviceIds = null) {
     shapeCountsByRoute.set(routeId, counts);
   }
 
-  return [...shapeCountsByRoute]
+  return mergeMapCorridors([...shapeCountsByRoute]
     .flatMap(([routeId, counts]) => (
       [...counts]
         .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .filter(([shapeId], index, sorted) => {
+          const key = shapeTerminalKey(shapePoints.get(shapeId));
+          return sorted.findIndex(([candidateId]) => (
+            shapeTerminalKey(shapePoints.get(candidateId)) === key
+          )) === index;
+        })
         .slice(0, MAX_SHAPES_PER_ROUTE)
         .map(([shapeId]) => ({
           type: "Feature",
@@ -77,7 +126,7 @@ export function buildRouteLineFeatures(trips, shapes, serviceIds = null) {
           },
         }))
     ))
-    .filter((feature) => feature.geometry.coordinates.length >= 2);
+    .filter((feature) => feature.geometry.coordinates.length >= 2));
 }
 
 function realtimeStopCoordinate(stopId, stopsById) {
@@ -162,34 +211,14 @@ export function buildRealtimeStationLineFeatures(
     .map(routeFamily)
     .filter((routeId, index, all) => all.indexOf(routeId) === index)
     .filter((routeId) => candidates.has(routeId));
-  const colorGroups = [];
-  for (const routeId of activeRoutes) {
-    const color = ROUTE_COLORS[routeId] || "808183";
-    const group = colorGroups.find((item) => item.color === color);
-    if (group) {
-      group.routeIds.push(routeId);
-    } else {
-      colorGroups.push({
-        color,
-        routeIds: [routeId],
-        path: candidates.get(routeId),
-      });
-    }
-  }
-  const middle = (colorGroups.length - 1) / 2;
-
-  return colorGroups.map((group, index) => ({
+  return activeRoutes.map((routeId, index) => ({
     type: "Feature",
-    properties: {
-      routeId: group.routeIds.join(","),
-      color: `#${group.color}`,
-      offset: (index - middle) * 8,
-    },
+    properties: { routeId, color: `#${ROUTE_COLORS[routeId] || "808183"}`, offset: (index - (activeRoutes.length - 1) / 2) * 8 },
     geometry: {
       type: "LineString",
-      coordinates: group.path.authoritative
-        ? group.path.coordinates
-        : smoothLineCoordinates(group.path.coordinates),
+      coordinates: candidates.get(routeId).authoritative
+        ? candidates.get(routeId).coordinates
+        : smoothLineCoordinates(candidates.get(routeId).coordinates),
     },
   }));
 }
@@ -216,6 +245,11 @@ export function buildRealtimeStationVehicles(
   now = Math.floor(Date.now() / 1000)
 ) {
   const displayedRouteSet = new Set(displayedRouteIds.map(routeFamily));
+  const reportedPositions = new Map(entities.flatMap((entity) => {
+    const tripId = entity.vehicle?.trip?.tripId;
+    const position = entity.vehicle?.position;
+    return tripId && position ? [[tripId, position]] : [];
+  }));
   const vehicles = [];
 
   for (const entity of entities) {
@@ -233,18 +267,27 @@ export function buildRealtimeStationVehicles(
 
     const nextIndex = timedStops.findIndex((item) => item.timestamp >= now);
     if (nextIndex < 0) continue;
-    let longitude = timedStops[nextIndex].coordinate[0];
-    let latitude = timedStops[nextIndex].coordinate[1];
+    const reportedPosition = reportedPositions.get(update.trip?.tripId);
+    let longitude = Number(reportedPosition?.longitude);
+    let latitude = Number(reportedPosition?.latitude);
+    const hasReportedPosition = Number.isFinite(longitude) && Number.isFinite(latitude);
+    if (!hasReportedPosition) {
+      longitude = timedStops[nextIndex].coordinate[0];
+      latitude = timedStops[nextIndex].coordinate[1];
+    }
     const directionStart = nextIndex > 0
       ? timedStops[nextIndex - 1]?.coordinate
       : timedStops[nextIndex]?.coordinate;
     const directionEnd = nextIndex > 0
       ? timedStops[nextIndex]?.coordinate
       : timedStops[nextIndex + 1]?.coordinate;
-    const directionBearing = directionStart && directionEnd
-      ? coordinateBearing(directionStart, directionEnd)
-      : 0;
-    if (nextIndex > 0) {
+    const reportedBearing = Number(reportedPosition?.bearing);
+    const directionBearing = Number.isFinite(reportedBearing)
+      ? reportedBearing
+      : directionStart && directionEnd
+        ? coordinateBearing(directionStart, directionEnd)
+        : 0;
+    if (!hasReportedPosition && nextIndex > 0) {
       const previous = timedStops[nextIndex - 1];
       const next = timedStops[nextIndex];
       const duration = Math.max(1, next.timestamp - previous.timestamp);
@@ -341,9 +384,9 @@ export async function getStationMapData(stopId) {
     serviceStopIds,
     data
   );
-  const realtimeColors = new Set(lines.map((line) => line.properties.color));
+  const realtimeRoutes = new Set(lines.map((line) => line.properties.routeId));
   const missingRouteIds = displayedRouteIds.filter((routeId) => (
-    !realtimeColors.has(`#${ROUTE_COLORS[routeFamily(routeId)] || "808183"}`)
+    !realtimeRoutes.has(routeFamily(routeId))
   ));
   if (missingRouteIds.length) {
     const displayedRouteSet = new Set(displayedRouteIds);
@@ -354,15 +397,9 @@ export async function getStationMapData(stopId) {
       ))
     ));
     const fallbackLines = buildRouteLineFeatures(trips, data.shapes, activeServiceIds(data));
-    const addedFallbackColors = new Set();
     const fallbackByColor = missingRouteIds.flatMap((displayedRouteId) => {
       const feature = fallbackLines.find((line) => line.properties.routeId === displayedRouteId);
       if (!feature) return [];
-      if (
-        realtimeColors.has(feature.properties.color) ||
-        addedFallbackColors.has(feature.properties.color)
-      ) return [];
-      addedFallbackColors.add(feature.properties.color);
       return [{
         ...feature,
         geometry: {
@@ -397,15 +434,24 @@ export async function getStationMapData(stopId) {
 }
 
 export async function getSubwayMapData() {
-  const [data, stations] = await Promise.all([getStatic(), getStations()]);
-  const lines = buildRouteLineFeatures(
-    data.trips,
-    data.shapes,
-    activeServiceIds(data)
+  const [data, entities, stations] = await Promise.all([
+    getStatic(),
+    getRealtime(),
+    getStations(),
+  ]);
+  const lines = buildCurrentRouteLines(data, entities);
+  const displayedRouteIds = [...new Set(stations.flatMap((station) => {
+    const activeRoutes = stationActiveRouteIds(station);
+    return activeRoutes.length ? activeRoutes : stationRouteIds(station);
+  }))];
+  const vehicles = snapVehiclesToLines(
+    buildRealtimeStationVehicles(entities, data.stopsById, displayedRouteIds),
+    lines
   );
 
   return {
     lines,
+    vehicles,
     stations: stations.map((station) => ({
       id: station.id,
       name: station.name,
@@ -422,4 +468,23 @@ export async function getSubwayMapData() {
       })),
     })),
   };
+}
+
+export function buildCurrentRouteLines(data, entities, now = Math.floor(Date.now() / 1000)) {
+  const activeRoutes = new Set();
+  const matchedTrips = new Map();
+  for (const entity of entities) {
+    const update = entity.tripUpdate;
+    if (!update || !(update.stopTimeUpdate || []).some((stop) => (stopUpdateTime(stop) || 0) >= now)) continue;
+    const routeId = routeFamily(update.trip?.routeId);
+    activeRoutes.add(routeId);
+    const trip = data.tripsByRealtimeId.get(tripLookupId(update.trip?.tripId));
+    if (trip?.shape_id) matchedTrips.set(trip.trip_id, { ...trip, route_id: routeId });
+  }
+  const matchedRoutes = new Set([...matchedTrips.values()].map((trip) => routeFamily(trip.route_id)));
+  const fallbackTrips = data.trips.filter((trip) => activeRoutes.has(routeFamily(trip.route_id)) && !matchedRoutes.has(routeFamily(trip.route_id)));
+  return [
+    ...buildRouteLineFeatures([...matchedTrips.values()], data.shapes),
+    ...(fallbackTrips.length ? buildRouteLineFeatures(fallbackTrips, data.shapes, activeServiceIds(data)) : []),
+  ];
 }
