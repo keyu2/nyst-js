@@ -1,5 +1,5 @@
 import { getBullet } from "./routes.js";
-import { layoutMapCorridors, placeMapVehicles } from "./mapCorridors.js";
+import { layoutMapCorridors, placeMapVehicles, placeMapStations, renderMapCorridors } from "./mapCorridors.js";
 
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
 const DIRECTION_ARROW_IMAGE = "subway-vehicle-direction-arrow";
@@ -22,7 +22,6 @@ export async function createSubwayMap({
 }) {
   const maplibreModule = await import("maplibre-gl");
   lines = layoutMapCorridors(lines);
-  vehicles = placeMapVehicles(vehicles, lines);
   const maplibregl = maplibreModule.default || maplibreModule;
   maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
 
@@ -63,6 +62,11 @@ export async function createSubwayMap({
       duration: 0,
     });
   }
+
+  map.__subwayGeometry = { lines, stations, vehicles };
+  lines = renderMapCorridors(map, lines);
+  stations = placeMapStations(stations, lines);
+  vehicles = placeMapVehicles(vehicles, lines);
 
   map.addSource("subway-lines", {
     type: "geojson",
@@ -134,12 +138,7 @@ export async function createSubwayMap({
       "icon-ignore-placement": true,
     },
   });
-  map.on("zoom", () => {
-    map.getSource("subway-vehicles")?.setData({
-      type: "FeatureCollection",
-      features: vehicleFeatures(map, map.__subwayVehicles || []),
-    });
-  });
+  map.on("zoom", () => refreshMapGeometry(map));
 
   if (onVehicleSelect) {
     const selectVehicle = (event) => {
@@ -331,23 +330,22 @@ function vehicleFeatures(map, vehicles) {
   }));
 }
 
+function refreshMapGeometry(map) {
+  const data = map.__subwayGeometry;
+  if (!data) return;
+  const lines = renderMapCorridors(map, data.lines);
+  const stations = placeMapStations(data.stations, lines);
+  const vehicles = placeMapVehicles(data.vehicles, lines);
+  map.getSource("subway-lines")?.setData({type:"FeatureCollection",features:lines});
+  map.getSource("subway-stations")?.setData({type:"FeatureCollection",features:stationFeatures(stations)});
+  map.getSource("subway-vehicles")?.setData({type:"FeatureCollection",features:vehicleFeatures(map,vehicles)});
+}
+
 export async function updateSubwayMapData(map, { lines, stations, vehicles = [] }) {
-  lines = layoutMapCorridors(lines);
-  vehicles = placeMapVehicles(vehicles, lines);
-  map?.getSource("subway-lines")?.setData({
-    type: "FeatureCollection",
-    features: lines,
-  });
-  map?.getSource("subway-stations")?.setData({
-    type: "FeatureCollection",
-    features: stationFeatures(stations),
-  });
+  if (!map) return;
   await ensureVehicleImages(map, vehicles);
-  map.__subwayVehicles = vehicles;
-  map?.getSource("subway-vehicles")?.setData({
-    type: "FeatureCollection",
-    features: vehicleFeatures(map, vehicles),
-  });
+  map.__subwayGeometry = {lines:layoutMapCorridors(lines),stations,vehicles};
+  refreshMapGeometry(map);
 }
 
 export function selectSubwayMapStation(map, stationId = "") {

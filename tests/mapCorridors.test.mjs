@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { layoutMapCorridors, placeMapVehicles } from "../app/lib/mapCorridors.js";
+import { layoutMapCorridors, placeMapVehicles, placeMapStations, renderMapCorridors } from "../app/lib/mapCorridors.js";
 
 test("shared R M F E tracks use four equally spaced service lanes", () => {
   const lines = ["E", "F", "M", "R"].map((routeId) => ({
@@ -30,7 +30,7 @@ test("curves retain every point when shared services join and leave", () => {
   assert.equal(result.length,2);
   assert.deepEqual(result.find((line)=>line.properties.routeId==="A").geometry.coordinates,path);
   assert.deepEqual(result.find((line)=>line.properties.routeId==="C").geometry.coordinates,path.slice(1,4));
-  assert.notEqual(result[0].properties.offset,result[1].properties.offset);
+  assert.notEqual(result[0].properties.laneOffsets[2],result[1].properties.laneOffsets[1]);
 });
 
 test("different sampling densities cannot clip a service into disconnected fragments", () => {
@@ -41,4 +41,24 @@ test("different sampling densities cannot clip a service into disconnected fragm
   assert.equal(result.length,2);
   assert.deepEqual(result.find((line)=>line.properties.routeId==="F").geometry.coordinates,coarse);
   assert.deepEqual(result.find((line)=>line.properties.routeId==="M").geometry.coordinates,dense);
+});
+
+test("sharing a distant corridor does not displace a solo section", () => {
+  const feature=(routeId,coordinates)=>({properties:{routeId,color:"#00933C"},geometry:{type:"LineString",coordinates}});
+  const result=layoutMapCorridors([
+    feature("G",[[-74,40.70],[-73.99,40.70],[-73.98,40.70]]),
+    feature("F",[[-74,40.70],[-73.995,40.70],[-73.995,40.69]]),
+  ]);
+  const green=result.find((line)=>line.properties.routeId==="G");
+  assert.equal(green.properties.laneOffsets.at(-1),0);
+  const map={getZoom:()=>15,project:([x,y])=>({x:x*10000,y:-y*10000}),unproject:([x,y])=>({toArray:()=>[x/10000,-y/10000]})};
+  const rendered=renderMapCorridors(map,result);
+  assert.deepEqual(rendered.find((line)=>line.properties.routeId==="G").geometry.coordinates.at(-1),[-73.98,40.70]);
+  const [station]=placeMapStations([{id:"test",name:"Test",longitude:-73.999,latitude:40.7001,routeIds:["G"]}],rendered);
+  const [vehicle]=placeMapVehicles([{routeId:"G",longitude:station.longitude,latitude:station.latitude}],rendered);
+  assert.ok(Math.abs(station.longitude-vehicle.longitude)<1e-9);
+  assert.ok(Math.abs(station.latitude-vehicle.latitude)<1e-9);
+  assert.equal(vehicle.offset,0);
+  const [express]=placeMapVehicles([{routeId:"SIX",longitude:-73.999,latitude:40.7001}],rendered.map((line)=>({...line,properties:{...line.properties,routeId:"SI"}})));
+  assert.equal(express.offset,0);
 });
