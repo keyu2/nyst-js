@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createBoardRouteGroups,
   createStationRouteFamilies,
+  createStationRouteGroups,
 } from "../app/lib/boardRouteGroups.js";
 import { buildRegularRouteIdsByStop } from "../app/lib/mta/feeds.js";
 
@@ -71,4 +72,19 @@ test("falls back to regular station routes when realtime service is unavailable"
   );
 
   assert.deepEqual(routeIds, ["3", "4"]);
+});
+
+
+test("station tabs group related lines while keeping each route selectable", () => {
+  assert.deepEqual(createStationRouteGroups(["1", "2", "3", "7", "GS", "N", "Q", "R", "W"]), [
+    ["1", "2", "3"], ["7"], ["GS"], ["N", "Q", "R", "W"],
+  ]);
+});
+
+test("station groups include rerouted services without restoring absent routes", () => {
+  const { familyIds } = createStationRouteFamilies(["7", "7X", "E", "F", "Q", "R"], [
+    { routes: ["7", "N", "Q", "R", "W"] },
+  ]);
+  assert.deepEqual(createStationRouteGroups(familyIds), [["7"], ["E"], ["F"], ["Q", "R"]]);
+  assert.deepEqual(createStationRouteGroups([]), []);
 });

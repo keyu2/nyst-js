@@ -1168,22 +1168,37 @@
   margin-top: 12px;
   padding-bottom: 18px;
 }
-.station-route-tabs > button {
+.station-route-group {
   display: flex;
   align-items: center;
-  padding: 8px;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid #777;
+  border-radius: 999px;
+}
+.station-route-group.active {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.station-route-group > button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px;
+  border: 0;
   border-radius: 999px;
   background: transparent;
   color: inherit;
-  font-weight: 600;
   cursor: pointer;
 }
-.station-route-tabs > button.active {
-  border: 2px solid currentColor;
-  background: rgb(128 128 128 / 18%);
-  font-weight: 700;
+.station-route-group > button.active {
+  background: rgb(128 128 128 / 28%);
 }
+.station-route-group > button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
 .station-no-service {
   display: flex;
   align-items: center;

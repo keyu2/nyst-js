@@ -11,28 +11,28 @@ const APPEARANCE_OPTIONS = [
   { value: "light", label: "Light" },
 ];
 const COUNTDOWN_OPTIONS = [
-  { value: "minutes", label: "Minutes" },
-  { value: "seconds", label: "Minutes + seconds" },
+  { value: "minutes", label: "Off" },
+  { value: "seconds", label: "On" },
 ];
 const TRIP_PROGRESS_OPTIONS = [
   { value: "minutes", label: "Minutes" },
   { value: "stops", label: "Stops away" },
 ];
 const DISPLAY_MODE_OPTIONS = [
-  { value: "standard", label: "Standard" },
-  { value: "board", label: "Display board" },
+  { value: "standard", label: "Arrival list" },
+  { value: "board", label: "Station board" },
 ];
 const ARRIVAL_INVERSION_OPTIONS = [
   { value: "on", label: "On" },
   { value: "off", label: "Off" },
 ];
 const LINE_SELECTION_OPTIONS = [
-  { value: "overview", label: "All lines" },
-  { value: "focus", label: "One at a time" },
+  { value: "overview", label: "Traditional" },
+  { value: "focus", label: "Slider" },
 ];
 const MOBILE_LINE_LAYOUT_OPTIONS = [
   { value: "grouped", label: "Grouped" },
-  { value: "rows", label: "Full rows" },
+  { value: "rows", label: "Full-width rows" },
 ];
 const MAP_OPTIONS = [
   { value: "on", label: "On" },
@@ -94,31 +94,31 @@ export default function SettingsClient() {
 
         <div className="settings-list">
           <SegmentedSetting
-            label="Appearance"
+            label="Theme"
             value={theme}
             onChange={setTheme}
             options={APPEARANCE_OPTIONS}
           />
           <SegmentedSetting
-            label="Show"
+            label="Show seconds"
             value={showSeconds ? "seconds" : "minutes"}
             onChange={(value) => setShowSeconds(value === "seconds")}
             options={COUNTDOWN_OPTIONS}
           />
           <div className="settings-preview" aria-label="Arrival countdown preview">
-            <span>Example arrival</span>
+            <span>Preview</span>
             <strong>{showSeconds ? "4m 32s" : "4 min"}</strong>
           </div>
 
           <SegmentedSetting
-            label="Trip progress"
+            label="Arrival estimate"
             value={tripProgressUnit}
             onChange={setTripProgressUnit}
             options={TRIP_PROGRESS_OPTIONS}
           />
 
           <SegmentedSetting
-            label="Display mode"
+            label="Station page"
             value={stationView}
             onChange={setStationView}
             options={DISPLAY_MODE_OPTIONS}
@@ -126,7 +126,7 @@ export default function SettingsClient() {
 
           {stationView === "board" && (
             <SegmentedSetting
-              label="0-minute inversion"
+              label="Highlight arriving trains"
               value={boardArrivalInversion ? "on" : "off"}
               onChange={(value) => setBoardArrivalInversion(value === "on")}
               options={ARRIVAL_INVERSION_OPTIONS}
@@ -134,7 +134,7 @@ export default function SettingsClient() {
           )}
 
           <SegmentedSetting
-            label="Home line selector"
+            label="Home page"
             value={lineView}
             onChange={setLineView}
             options={LINE_SELECTION_OPTIONS}
@@ -142,7 +142,7 @@ export default function SettingsClient() {
 
           <SegmentedSetting
             className="settings-row--mobile-only"
-            label="Mobile line layout"
+            label="Line layout on phones"
             value={mobileLineLayout}
             onChange={setMobileLineLayout}
             options={MOBILE_LINE_LAYOUT_OPTIONS}

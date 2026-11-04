@@ -308,3 +308,24 @@ test("train markers snap to their matching route color", () => {
   assert.equal(vehicles[0].offset, 4);
   assert.equal(vehicles[0].bearing, 90);
 });
+
+
+test("maps hide trips before their start even when a vehicle position is reported", () => {
+  const stops = new Map([["Q01S", { stop_lon: "-74", stop_lat: "40.7" }]]);
+  const now = Date.parse("2026-11-04T19:00:00-05:00") / 1000;
+  const trip = { routeId: "Q", tripId: "q-pending", startDate: "20261104", startTime: "19:06:00" };
+  const entities = [{ tripUpdate: { trip, stopTimeUpdate: [{ stopId: "Q01S", arrival: { time: now + 360 } }] } }, { vehicle: { trip, position: { longitude: -74, latitude: 40.7 } } }];
+  assert.deepEqual(buildRealtimeStationVehicles(entities, stops, ["Q"], now), []);
+  assert.equal(buildRealtimeStationVehicles(entities, stops, ["Q"], now + 360).length, 1);
+});
+
+test("maps hide delayed trains still waiting at their origin without hiding a running train's next stop", () => {
+  const stops = new Map([["Q01S", { stop_lon: "-74", stop_lat: "40.7" }], ["Q02S", { stop_lon: "-73.99", stop_lat: "40.71" }]]);
+  const now = Date.parse("2026-11-04T19:00:00-05:00") / 1000;
+  const trip = { routeId: "Q", tripId: "q-delayed", startDate: "20261104", startTime: "18:55:00" };
+  const data = { tripsByRealtimeId: new Map([["q-delayed", { trip_id: "scheduled" }]]), stopTimesByTrip: new Map([["scheduled", [{ stop_id: "Q01S", departure_time: "18:55:00" }]]]) };
+  const pending = { tripUpdate: { trip, stopTimeUpdate: [{ stopId: "Q01S", departure: { time: now + 60 } }] } };
+  assert.deepEqual(buildRealtimeStationVehicles([pending], stops, ["Q"], now, data), []);
+  pending.tripUpdate.stopTimeUpdate = [{ stopId: "Q02S", departure: { time: now + 120 } }];
+  assert.equal(buildRealtimeStationVehicles([pending], stops, ["Q"], now, data).length, 1);
+});

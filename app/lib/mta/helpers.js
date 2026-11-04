@@ -1,6 +1,6 @@
 import { normalizeRouteId, routeFamily } from "../routes.js";
-import { gtfsMinute, unixSeconds } from "../time.js";
-import { isPublicStopId, stationStopId } from "./stopIds.js";
+import { currentNewYorkSecond, gtfsMinute, gtfsSecond, tripIdStartSecond, tripStartTimestamp, unixSeconds } from "../time.js";
+import { isPublicStopId, stationStopId, tripLookupId } from "./stopIds.js";
 
 const NEW_YORK_SERVICE_DATE = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York",
@@ -143,4 +143,20 @@ export function tripsNearCurrentTime(trips, stopTimesByTrip, nowMinute, windowMi
       Math.abs(departureMinute - (nowMinute + 1440))
     ) <= windowMinutes;
   });
+}
+
+export function tripHasDeparted(update, data, now) {
+  if (!update?.trip || update.trip.scheduleRelationship === 3) return false;
+  const staticTrip = data?.tripsByRealtimeId.get(tripLookupId(update.trip.tripId));
+  const scheduledStops = data?.stopTimesByTrip.get(staticTrip?.trip_id) || [];
+  const origin = scheduledStops[0];
+  const startSecond = gtfsSecond(update.trip.startTime)
+    ?? tripIdStartSecond(update.trip.tripId)
+    ?? gtfsSecond(origin?.departure_time || origin?.arrival_time);
+  const start = tripStartTimestamp(update.trip.startDate, startSecond)
+    ?? (startSecond === null ? null : now - currentNewYorkSecond() + startSecond);
+  if (start !== null && start > now) return false;
+  const originUpdate = origin && update.stopTimeUpdate?.find((item) => item.stopId === origin.stop_id);
+  const departure = unixSeconds(originUpdate?.departure?.time ?? originUpdate?.arrival?.time);
+  return !(departure > now);
 }

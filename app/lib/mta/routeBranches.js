@@ -1,4 +1,4 @@
-import { gtfsMinute } from "../time.js";
+import { gtfsMinute, unixSeconds } from "../time.js";
 import { routeFamily } from "../routes.js";
 import { hasServiceAtStops } from "./routePattern.js";
 import { stationStopId } from "./stopIds.js";
@@ -137,14 +137,21 @@ function representativeABranches({ candidates, nowMinute, scheduledToday, stopTi
   )).filter(Boolean);
 }
 
-function hasRealtimeRockawayParkService(realtimeEntities) {
-  return realtimeEntities.some((entity) => {
+function realtimeABranches(entities, now) {
+  const branches = new Set();
+  for (const entity of entities) {
     const update = entity.tripUpdate;
-    if (routeFamily(update?.trip?.routeId) !== "A") return false;
-    return (update.stopTimeUpdate || []).some((item) => (
-      ROCKAWAY_PARK_STOPS.has(stationStopId(item.stopId))
-    ));
-  });
+    if (routeFamily(update?.trip?.routeId) !== "A" || update.trip.scheduleRelationship === 3) continue;
+    for (const item of update.stopTimeUpdate || []) {
+      if ((unixSeconds(item.arrival?.time || item.departure?.time) || 0) < now) continue;
+      const id = stationStopId(item.stopId);
+      if (["A63", "A64", "A65"].includes(id)) branches.add("lefferts");
+      if (["H01", "H02", "H03", "H04"].includes(id)) branches.add("rockaway-trunk");
+      if (["H06", "H07", "H08", "H09", "H10", "H11"].includes(id)) branches.add("far-rockaway");
+      if (ROCKAWAY_PARK_STOPS.has(id)) branches.add("rockaway-park");
+    }
+  }
+  return branches;
 }
 
 export function buildARouteBranches({
@@ -156,16 +163,24 @@ export function buildARouteBranches({
   routeStop,
   scheduledToday,
   stopTimesByTrip,
+  now = Math.floor(Date.now() / 1000),
+  realtimeAvailable = realtimeEntities.length > 0,
 }) {
-  const selectedBranches = representativeABranches({
+  let selectedBranches = representativeABranches({
     candidates,
     nowMinute,
     scheduledToday,
     stopTimesByTrip,
   });
 
+  const activeBranches = realtimeABranches(realtimeEntities, now);
+  const trunkPattern = selectedBranches[0]?.stopIds || normalStopIds;
+  if (realtimeAvailable) {
+    selectedBranches = selectedBranches.filter((branch) => activeBranches.has(branch.id) || (branch.id === "far-rockaway" && (activeBranches.has("rockaway-trunk") || activeBranches.has("rockaway-park"))));
+  }
+
   if (
-    hasRealtimeRockawayParkService(realtimeEntities)
+    activeBranches.has("rockaway-park")
     && !selectedBranches.some((branch) => branch.id === "rockaway-park")
   ) {
     selectedBranches.push({
@@ -175,7 +190,7 @@ export function buildARouteBranches({
     });
   }
 
-  const staticPattern = selectedBranches[0]?.stopIds || normalStopIds;
+  const staticPattern = trunkPattern;
   const junctionIndex = staticPattern.indexOf("A61");
   if (junctionIndex < 0) return { normalStopIds, branches: [] };
 
@@ -203,6 +218,9 @@ export function buildARouteBranches({
         ? branch.stopIds.indexOf("H12")
         : branch.stopIds.indexOf("A61") + 1;
       let branchStopIds = branch.stopIds.slice(branchStart);
+      if (realtimeAvailable && branch.id === "far-rockaway" && !activeBranches.has("far-rockaway")) {
+        branchStopIds = branchStopIds.slice(0, branchStopIds.indexOf("H04") + 1);
+      }
 
       // Aqueduct Racetrack is served in one direction and may be absent from
       // the representative Far Rockaway-bound trip pattern.

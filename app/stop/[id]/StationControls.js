@@ -6,6 +6,7 @@ import RouteBullet from "../../components/RouteBullet";
 export function StationRouteTabs({
   activeRoute,
   routeFamilies,
+  routeGroups,
   sameStationTransfers,
   onRouteChange,
 }) {
@@ -15,25 +16,33 @@ export function StationRouteTabs({
       role="tablist"
       aria-label="Subway lines at this station"
     >
-      {[...routeFamilies.entries()].map(([familyId, memberIds]) => {
-        const selected = familyId === activeRoute;
-
-        return (
-          <button
-            key={familyId}
-            type="button"
-            role="tab"
-            aria-label={`${memberIds.join(" and ")} Train`}
-            aria-selected={selected}
-            onClick={() => onRouteChange(familyId)}
-            className={selected ? "active" : ""}
-          >
-            {memberIds.map((routeId) => (
-              <RouteBullet key={routeId} routeId={routeId} size={28} />
-            ))}
-          </button>
-        );
-      })}
+      {routeGroups.map((families) => (
+        <div
+          className={`station-route-group${families.includes(activeRoute) ? " active" : ""}`}
+          key={families.join("-")}
+          role="presentation"
+        >
+          {families.map((familyId) => {
+            const memberIds = routeFamilies.get(familyId);
+            const selected = familyId === activeRoute;
+            return (
+              <button
+                key={familyId}
+                type="button"
+                role="tab"
+                aria-label={`${memberIds.join(" and ")} Train`}
+                aria-selected={selected}
+                onClick={() => onRouteChange(familyId)}
+                className={selected ? "active" : ""}
+              >
+                {memberIds.map((routeId) => (
+                  <RouteBullet key={routeId} routeId={routeId} size={28} />
+                ))}
+              </button>
+            );
+          })}
+        </div>
+      ))}
 
       {sameStationTransfers.map((service) => (
         <Link

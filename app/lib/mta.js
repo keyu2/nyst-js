@@ -19,6 +19,7 @@ import {
   offRouteTerminalBranches,
 } from "./mta/routePattern.js";
 import { buildARouteBranches, buildFiveRouteBranches } from "./mta/routeBranches.js";
+import { applyTrackService } from "./mta/routeTracks.js";
 import { currentNewYorkMinute, unixSeconds } from "./time.js";
 import { getRouteAlerts } from "./mta/alerts.js";
 
@@ -65,8 +66,10 @@ export async function getRoute(id) {
     getRouteAlerts(id).catch(() => []),
   ]);
   let realtimeEntities = [];
+  let realtimeAvailable = false;
   try {
     realtimeEntities = await getRealtime();
+    realtimeAvailable = true;
   } catch {
     realtimeEntities = [];
   }
@@ -75,7 +78,6 @@ export async function getRoute(id) {
     Math.floor(Date.now() / 1000)
   );
   let activeRouteStopIds = new Set();
-  let hasRealtimeRouteService = false;
   const routeStop = (stopId) => {
     const transferRoutes = interchangeRouteIds(stopId, data, id, realtimeRoutesByStop);
     return {
@@ -83,7 +85,7 @@ export async function getRoute(id) {
       accessible: metadata.accessibleIds.has(stationStopId(stopId)),
       borough: metadata.boroughByStopId.get(stationStopId(stopId)) || null,
       transferRoutes,
-      hasService: hasRealtimeRouteService
+      hasService: realtimeAvailable
         ? activeRouteStopIds.has(stationStopId(stopId))
         : null,
     };
@@ -180,7 +182,6 @@ export async function getRoute(id) {
   for (const stopId of alertSectionStopIds(routeAlerts, canonicalStops)) {
     activeRouteStopIds.add(stopId);
   }
-  hasRealtimeRouteService = activeRouteStopIds.size > 0;
   const realtimePattern = mostCompletePattern(currentRealtimePatterns);
   const detouredStopIds = applyRealtimeDetour(normalStopIds, currentRealtimePatterns);
   const hasRealtimeDetour = detouredStopIds !== normalStopIds;
@@ -209,6 +210,8 @@ export async function getRoute(id) {
       nowMinute,
       realtimeEntities,
       realtimePatterns: currentRealtimePatterns,
+      realtimeAvailable,
+      now,
       routeStop,
       scheduledToday,
       stopTimesByTrip: data.stopTimesByTrip,
@@ -233,6 +236,7 @@ export async function getRoute(id) {
   })));
 
   const stops = normalStopIds.map(routeStop);
+  applyTrackService(id, stops, branches, currentRealtimePatterns, realtimeAvailable);
   return {
     id,
     color: ROUTE_COLORS[id],

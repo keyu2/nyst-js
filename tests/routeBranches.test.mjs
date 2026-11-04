@@ -114,3 +114,28 @@ test("orders the 5 north-to-south and exposes Nereid when realtime serves it", (
   assert.equal(result.branches[0].id, "nereid");
   assert.equal(result.branches[0].stops.at(-1).id, "212");
 });
+
+test("A branches follow future realtime service rather than scheduled trains or past stop records", () => {
+  const ids = {
+    lefferts: ["A02", "A61", "A63", "A65"],
+    far: ["A02", "A61", "H02", "H04", "H06", "H11"],
+    park: ["A02", "A61", "H02", "H04", "H12", "H15"],
+  };
+  const candidates = Object.keys(ids).map((trip_id) => ({ trip_id }));
+  const entity = (routeId, stopId, time, scheduleRelationship = 0) => ({ tripUpdate: {
+    trip: { routeId, scheduleRelationship }, stopTimeUpdate: [{ stopId, arrival: { time } }],
+  } });
+  const build = (entities, realtimeAvailable = true) => buildARouteBranches({
+    candidates, scheduledToday: candidates,
+    stopTimesByTrip: new Map(Object.entries(ids).map(([id, values]) => [id, stopTimes(values)])),
+    normalStopIds: ["A02", "A61"], nowMinute: 600, now: 1000,
+    realtimeEntities: entities, realtimeAvailable, routeStop,
+  });
+  assert.deepEqual(build([entity("A", "H11S", 1100), entity("A", "H15S", 900)]).branches.map(({ id }) => id), ["far-rockaway"]);
+  assert.deepEqual(build([]).branches, []);
+  assert.equal(build([], false).branches.length, 3);
+  assert.deepEqual(build([entity("A", "H15S", 1100, 3), entity("SR", "H15S", 1100)]).branches, []);
+  const parkOnly = build([entity("A", "H12N", 1100)]).branches;
+  assert.deepEqual(parkOnly.map(({ id }) => id), ["far-rockaway", "rockaway-park"]);
+  assert.deepEqual(parkOnly[0].stops.map(({ id }) => id), ["H01", "H02", "H04"]);
+});

@@ -53,3 +53,18 @@ export function createStationRouteFamilies(
 
   return { routeIds, routeFamilies, familyIds: [...routeFamilies.keys()] };
 }
+
+export function createStationRouteGroups(familyIds) {
+  const trunks = [
+    ["1", "2", "3"], ["4", "5", "6"], ["7"],
+    ["A", "C", "E"], ["B", "D", "F", "M"],
+    ["J", "Z"], ["N", "Q", "R", "W"],
+  ];
+  const groups = [];
+  for (const family of familyIds) {
+    const trunk = trunks.find((members) => members.includes(family)) || [family];
+    if (groups.some((members) => members.includes(family))) continue;
+    groups.push(trunk.filter((member) => familyIds.includes(member)));
+  }
+  return groups;
+}

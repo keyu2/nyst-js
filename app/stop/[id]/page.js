@@ -8,7 +8,6 @@ import StationTrains from "./StationTrains";
 import { getRouteAlerts, getStop } from "../../lib/mta";
 import { getStationMapData } from "../../lib/mta/map";
 import { routeFamily } from "../../lib/routes";
-import StationMap from "./StationMap";
 
 function groupTransfersByName(transfers) {
   const groups = new Map();
@@ -58,51 +57,8 @@ export default async function StopPage({ params, searchParams }) {
       <BackButton href={route ? `/route/${encodeURIComponent(route)}` : "/subway"} />
       <HomeButton />
 
-      {stationMapData && <StationMap {...stationMapData} />}
-
-      <div className="stop-page-heading">
-        <h1 className="stop-page-title">
-          {stop.name}
-        </h1>
-        {stop.accessible && <Image className="stop-accessible-icon" src="/icons/accessible.svg" alt="Accessible station" width={30} height={30} />}
-        <FavoriteStationButton station={{
-          id,
-          ids: [...new Set([id, ...(stop.services || []).map((service) => service.id)])],
-          name: stop.name,
-          route: route || alertRouteIds[0] || "",
-          routes: alertRouteIds,
-        }} />
-      </div>
-
-      {otherStationTransfers.length > 0 && (
-        <div className="transfer-section">
-          <div className="transfer-label">Transfer is available to:</div>
-          <div className="transfer-groups">
-            {otherStationTransfers.map((station) => {
-              const target = station.services[0];
-              const routes = [...new Set(station.services.flatMap((service) => service.routes))];
-
-              return (
-                <Link
-                  key={station.name}
-                  className="transfer-station-group"
-                  href={`/stop/${target.stop.id}?route=${encodeURIComponent(target.routes[0] || "")}`}
-                  aria-label={`${station.name}: ${routes.join(", ")} trains`}
-                >
-                  <span>{station.name}</span>
-                  <span className="transfer-station-routes">
-                    {routes.map((routeId) => (
-                      <RouteBullet key={routeId} routeId={routeId} size={24} />
-                    ))}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <StationTrains
+        stationMapData={stationMapData}
         northbound={northbound}
         southbound={southbound}
         stopId={id}
@@ -113,7 +69,50 @@ export default async function StopPage({ params, searchParams }) {
         alertsByRoute={alertsByRoute}
         stopName={stop.name}
         stationServices={stop.services}
-      />
+      >
+        <div className="stop-page-heading">
+          <h1 className="stop-page-title">
+            {stop.name}
+          </h1>
+          {stop.accessible && <Image className="stop-accessible-icon" src="/icons/accessible.svg" alt="Accessible station" width={30} height={30} />}
+          <FavoriteStationButton station={{
+            id,
+            ids: [...new Set([id, ...(stop.services || []).map((service) => service.id)])],
+            name: stop.name,
+            route: route || alertRouteIds[0] || "",
+            routes: alertRouteIds,
+          }} />
+        </div>
+
+        {otherStationTransfers.length > 0 && (
+          <div className="transfer-section">
+            <div className="transfer-label">Transfer is available to:</div>
+            <div className="transfer-groups">
+              {otherStationTransfers.map((station) => {
+                const target = station.services[0];
+                const routes = [...new Set(station.services.flatMap((service) => service.routes))];
+
+                return (
+                  <Link
+                    key={station.name}
+                    className="transfer-station-group"
+                    href={`/stop/${target.stop.id}?route=${encodeURIComponent(target.routes[0] || "")}`}
+                    aria-label={`${station.name}: ${routes.join(", ")} trains`}
+                  >
+                    <span>{station.name}</span>
+                    <span className="transfer-station-routes">
+                      {routes.map((routeId) => (
+                        <RouteBullet key={routeId} routeId={routeId} size={24} />
+                      ))}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+      </StationTrains>
     </main>
   );
 }

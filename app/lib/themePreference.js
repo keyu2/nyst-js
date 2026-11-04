@@ -42,3 +42,19 @@ export function useThemePreference() {
   const theme = useSyncExternalStore(subscribe, getSnapshot, () => "system");
   return { theme, setTheme: setThemePreference };
 }
+
+function subscribeSystemTheme(callback) {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+
+function systemTheme() {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+export function useMapTheme() {
+  const { theme } = useThemePreference();
+  const system = useSyncExternalStore(subscribeSystemTheme, systemTheme, () => "light");
+  return theme === "system" ? system : theme;
+}

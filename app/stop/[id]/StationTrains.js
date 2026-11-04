@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import RouteBullet from "../../components/RouteBullet";
 import { StationServiceAlerts } from "../../components/ServiceAlerts";
 import StationDisplayBoard from "./StationDisplayBoard";
+import StationMap from "./StationMap";
 import TrainDirection from "./TrainDirection";
 import { DirectionSelector, StationRouteTabs } from "./StationControls";
 import { useSubwayPreferences } from "../../lib/preferences";
@@ -12,6 +13,7 @@ import { routeFamily } from "../../lib/routes";
 import {
   createBoardRouteGroups,
   createStationRouteFamilies,
+  createStationRouteGroups,
 } from "../../lib/boardRouteGroups";
 import {
   directionGroupLabel,
@@ -47,6 +49,8 @@ function groupDirectionOptions(options, stopBorough) {
 }
 
 export default function StationTrains({
+  children,
+  stationMapData,
   northbound,
   southbound,
   stopId,
@@ -101,6 +105,15 @@ export default function StationTrains({
     return () => window.clearInterval(refreshTimer);
   }, [router]);
   const activeRoute = familyIds.includes(selectedRoute) ? selectedRoute : familyIds[0] || "";
+  const routeGroups = useMemo(() => createStationRouteGroups(familyIds), [familyIds]);
+  const mapRouteIds = routeGroups.find((members) => members.includes(activeRoute)) || [];
+  const map = stationMapData && (
+    <StationMap
+      {...stationMapData}
+      lines={stationMapData.lines.filter((line) => mapRouteIds.includes(routeFamily(line.properties.routeId)))}
+      vehicles={stationMapData.vehicles.filter((vehicle) => mapRouteIds.includes(routeFamily(vehicle.routeId)))}
+    />
+  );
   const directionOptions = useMemo(
     () => realtimeDirectionOptions({
       activeRoute,
@@ -124,10 +137,12 @@ export default function StationTrains({
     : activeDirectionGroup?.options.flatMap((option) => option.trains) || [];
   const activeRouteAlerts = alertsByRoute[activeRoute] || [];
 
-  if (!routeIds.length) return null;
+  if (!routeIds.length) return <>{map}{children}</>;
 
   if (stationView === "board") {
     return (
+      <>
+      {children}
       <StationDisplayBoard
         alertsByRoute={alertsByRoute}
         invertArrivingTrains={boardArrivalInversion}
@@ -141,14 +156,19 @@ export default function StationTrains({
         stopId={stopId}
         stopName={stopName}
       />
+      </>
     );
   }
 
   return (
+    <>
+    {map}
+    {children}
     <div className="station-trains station-trains--standard">
       <StationRouteTabs
         activeRoute={activeRoute}
         routeFamilies={routeFamilies}
+        routeGroups={routeGroups}
         sameStationTransfers={sameStationTransfers}
         onRouteChange={(familyId) => {
           setSelectedRoute(familyId);
@@ -209,5 +229,6 @@ export default function StationTrains({
         />
       )}
     </div>
+    </>
   );
 }

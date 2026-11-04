@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMapTheme } from "../../../lib/themePreference";
 import { useSubwayPreferences } from "../../../lib/preferences";
 import {
   createSubwayMap,
   selectSubwayMapStation,
   updateSubwayMapData,
+  updateSubwayMapTheme,
 } from "../../../lib/subwayMapClient";
 import { parentStopId } from "../../../lib/tripProgress";
 
@@ -32,10 +34,17 @@ function routeBounds(coordinates) {
 export default function TripMap({ coordinates, nextStop, routeColor, routeId, stopTimes, vehicle }) {
   const { mapEnabled, stationView } = useSubwayPreferences();
   const router = useRouter();
+  const theme = useMapTheme();
   const mapContainer = useRef(null);
   const mapInstance = useRef(null);
   const [mapError, setMapError] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const themeRef = useRef(theme);
+
+  useEffect(() => {
+    themeRef.current = theme;
+    if (mapInstance.current) updateSubwayMapTheme(mapInstance.current, theme);
+  }, [theme, mapReady]);
   const stationKey = JSON.stringify(stopTimes.flatMap((stopTime) => {
     const stop = stopTime.stop;
     if (!stop || !validCoordinate(stop.longitude, stop.latitude)) return [];
@@ -79,6 +88,7 @@ export default function TripMap({ coordinates, nextStop, routeColor, routeId, st
           container: mapContainer.current,
           controls: false,
           lineCasing: false,
+          theme: themeRef.current,
           lines,
           onStationSelect: (stationId) => {
             router.push(`/stop/${encodeURIComponent(stationId)}?route=${encodeURIComponent(routeId)}`);

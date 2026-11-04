@@ -3,6 +3,7 @@ import { gtfsMinute, gtfsSecond } from "../time.js";
 import { getRealtime, getStatic } from "./feeds.js";
 import {
   activeServiceIds,
+  tripHasDeparted,
   compatibleStopTime,
   displayTripRouteId,
   interchangeRouteIds,
@@ -240,10 +241,10 @@ export async function getTrip(requestedRouteId, tripId) {
     displayRouteId,
     routeColor
   );
-  const vehicle = snapVehiclesToLines(
+  const vehicle = tripHasDeparted(update, data, now) ? snapVehiclesToLines(
     reportedVehicle
       ? [reportedVehicle]
-      : buildRealtimeStationVehicles([entity], data.stopsById, [displayRouteId], now),
+      : buildRealtimeStationVehicles([entity], data.stopsById, [displayRouteId], now, data),
     mapCoordinates.length >= 2 ? [{
       type: "Feature",
       properties: {
@@ -253,7 +254,7 @@ export async function getTrip(requestedRouteId, tripId) {
       },
       geometry: { type: "LineString", coordinates: mapCoordinates },
     }] : []
-  )[0] || null;
+  )[0] || null : null;
 
   return {
     id: tripId,

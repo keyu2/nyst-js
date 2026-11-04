@@ -1,7 +1,10 @@
 import { getBullet } from "./routes.js";
-import { layoutMapCorridors, placeMapVehicles, placeMapStations, renderMapCorridors } from "./mapCorridors.js";
+import { layoutMapCorridors, placeMapVehicles, placeMapStations, renderMapCorridors, mapStationLabels, mapStationConnections, visibleMapItems } from "./mapCorridors.js";
 
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
+const MAP_STYLES = {
+  dark: "https://tiles.openfreemap.org/styles/dark",
+  light: "https://tiles.openfreemap.org/styles/positron",
+};
 const DIRECTION_ARROW_IMAGE = "subway-vehicle-direction-arrow";
 
 export async function createSubwayMap({
@@ -10,6 +13,7 @@ export async function createSubwayMap({
   container,
   controls = true,
   lineCasing = true,
+  theme = "dark",
   lines,
   onStationSelect,
   onVehicleSelect,
@@ -27,7 +31,7 @@ export async function createSubwayMap({
 
   const map = new maplibregl.Map({
     container,
-    style: MAP_STYLE,
+    style: MAP_STYLES[theme],
     center,
     zoom,
     minZoom: 9,
@@ -35,6 +39,7 @@ export async function createSubwayMap({
     attributionControl: { compact: true },
     scrollZoom: true,
   });
+  map.__subwayTheme = theme;
   map.setMissingStyleImageResolver(async (id) => {
     if (id !== "wood-pattern" || map.hasImage(id)) return;
     map.addImage(id, {
@@ -65,8 +70,8 @@ export async function createSubwayMap({
 
   map.__subwayGeometry = { lines, stations, vehicles };
   lines = renderMapCorridors(map, lines);
-  stations = placeMapStations(stations, lines);
-  vehicles = placeMapVehicles(vehicles, lines);
+  stations = placeMapStations(visibleMapItems(map, stations), lines);
+  vehicles = placeMapVehicles(visibleMapItems(map, vehicles), lines);
 
   map.addSource("subway-lines", {
     type: "geojson",
@@ -103,7 +108,7 @@ export async function createSubwayMap({
         9, ["*", ["get", "offset"], 0.55],
         15, ["get", "offset"],
       ],
-      "line-opacity": 0.88,
+      "line-opacity": 1,
     },
   });
 
@@ -120,7 +125,7 @@ export async function createSubwayMap({
     source: "subway-vehicles",
     layout: {
       "icon-image": DIRECTION_ARROW_IMAGE,
-      "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.72, 15, 1],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.45, 15, 0.7],
       "icon-rotate": ["get", "directionBearing"],
       "icon-rotation-alignment": "map",
       "icon-allow-overlap": true,
@@ -133,12 +138,21 @@ export async function createSubwayMap({
     source: "subway-vehicles",
     layout: {
       "icon-image": ["get", "icon"],
-      "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.72, 15, 1],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.45, 15, 0.7],
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
     },
   });
-  map.on("zoom", () => refreshMapGeometry(map));
+  let geometryFrame = 0;
+  const scheduleGeometry = () => {
+    if (geometryFrame) return;
+    geometryFrame = requestAnimationFrame(() => {
+      geometryFrame = 0;
+      refreshMapGeometry(map);
+    });
+  };
+  map.on("move", scheduleGeometry);
+  map.on("remove", () => cancelAnimationFrame(geometryFrame));
 
   if (onVehicleSelect) {
     const selectVehicle = (event) => {
@@ -154,27 +168,34 @@ export async function createSubwayMap({
     }
   }
 
-  const stationFeatures = stations.map((station) => ({
-    type: "Feature",
-    properties: { id: station.id, name: station.name },
-    geometry: {
-      type: "Point",
-      coordinates: [station.longitude, station.latitude],
-    },
-  }));
+  map.addSource("subway-station-connections", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: mapStationConnections(map, stations) },
+  });
+  map.addLayer({
+    id: "subway-station-connections",
+    type: "line",
+    source: "subway-station-connections",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#171717", "line-width": 2.5 },
+  });
   map.addSource("subway-stations", {
     type: "geojson",
-    data: { type: "FeatureCollection", features: stationFeatures },
+    data: { type: "FeatureCollection", features: stationFeatures(stations) },
+  });
+  map.addSource("subway-station-labels", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: stationFeatures(mapStationLabels(stations)) },
   });
   map.addLayer({
     id: "subway-stations",
     type: "circle",
     source: "subway-stations",
     paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 15, 6],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 1.7, 15, 3.5],
       "circle-color": "#050505",
       "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.75, 15, 2],
+      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 15, 1.3],
     },
   });
   map.addLayer({
@@ -183,17 +204,17 @@ export async function createSubwayMap({
     source: "subway-stations",
     filter: ["==", ["get", "id"], selectedStationId],
     paint: {
-      "circle-radius": 10,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 15, 5.5],
       "circle-color": "#ffffff",
       "circle-stroke-color": "#000000",
-      "circle-stroke-width": 3,
+      "circle-stroke-width": 2,
     },
   });
   if (showStationLabels) {
     map.addLayer({
       id: "subway-station-labels",
       type: "symbol",
-      source: "subway-stations",
+      source: "subway-station-labels",
       layout: {
         "text-field": ["get", "name"],
         "text-font": ["Noto Sans Regular"],
@@ -215,6 +236,7 @@ export async function createSubwayMap({
   }
   map.moveLayer("subway-vehicle-directions");
   map.moveLayer("subway-vehicles");
+  applyMapThemeColors(map, theme);
 
   if (onStationSelect) {
     const selectStation = (event) => {
@@ -233,10 +255,58 @@ export async function createSubwayMap({
   return map;
 }
 
+function applyMapThemeColors(map, theme) {
+    const foreground = theme === "dark" ? "#ffffff" : "#171717";
+    const background = theme === "dark" ? "#050505" : "#ffffff";
+    for (const layer of map.getStyle().layers || []) {
+    if (layer.id.startsWith("subway-") || layer.id === "selected-subway-station" || layer.type !== "symbol") continue;
+    if (layer.layout?.["text-field"]) map.setPaintProperty(layer.id, "text-opacity", 0.45);
+    if (layer.layout?.["icon-image"]) map.setPaintProperty(layer.id, "icon-opacity", 0.3);
+  }
+  if (map.getLayer("subway-stations")) {
+        map.setPaintProperty("subway-stations", "circle-color", "#ffffff");
+        map.setPaintProperty("subway-stations", "circle-stroke-color", "#171717");
+    }
+    if (map.getLayer("selected-subway-station")) {
+        map.setPaintProperty("selected-subway-station", "circle-color", foreground);
+        map.setPaintProperty("selected-subway-station", "circle-stroke-color", background);
+    }
+    if (map.getLayer("subway-station-labels")) {
+        map.setPaintProperty("subway-station-labels", "text-color", foreground);
+        map.setPaintProperty("subway-station-labels", "text-halo-color", background);
+    }
+}
+export function updateSubwayMapTheme(map, theme) {
+    if (map.__subwayTheme === theme)
+        return;
+    map.__subwayTheme = theme;
+    map.once("style.load", () => {
+        const vehicles = map.__subwayGeometry?.vehicles || [];
+        ensureDirectionArrowImage(map);
+        void ensureVehicleImages(map, vehicles).catch((error) => map.fire("error", { error }));
+        applyMapThemeColors(map, map.__subwayTheme);
+        refreshMapGeometry(map);
+    });
+    map.setStyle(MAP_STYLES[theme], {
+        transformStyle: (previous, next) => {
+            if (!previous)
+                return next;
+            return {
+                ...next,
+                sources: {
+                    ...next.sources,
+                    ...Object.fromEntries(Object.entries(previous.sources).filter(([id]) => id.startsWith("subway-"))),
+                },
+                layers: [...next.layers, ...previous.layers.filter((layer) => layer.id.startsWith("subway-") || layer.id === "selected-subway-station")],
+            };
+        },
+    });
+}
+
 function stationFeatures(stations) {
   return stations.map((station) => ({
     type: "Feature",
-    properties: { id: station.id, name: station.name },
+    properties: { id: station.id, name: station.name, routeId: station.routeId || "" },
     geometry: {
       type: "Point",
       coordinates: [station.longitude, station.latitude],
@@ -255,9 +325,9 @@ function ensureDirectionArrowImage(map) {
   canvas.height = 96;
   const context = canvas.getContext("2d");
   context.beginPath();
-  context.moveTo(48, 0);
-  context.lineTo(38, 17);
-  context.lineTo(58, 17);
+  context.moveTo(48, 18);
+  context.lineTo(38, 34);
+  context.lineTo(58, 34);
   context.closePath();
   context.fillStyle = "#ffffff";
   context.fill();
@@ -334,9 +404,11 @@ function refreshMapGeometry(map) {
   const data = map.__subwayGeometry;
   if (!data) return;
   const lines = renderMapCorridors(map, data.lines);
-  const stations = placeMapStations(data.stations, lines);
-  const vehicles = placeMapVehicles(data.vehicles, lines);
+  const stations = placeMapStations(visibleMapItems(map, data.stations), lines);
+  const vehicles = placeMapVehicles(visibleMapItems(map, data.vehicles), lines);
   map.getSource("subway-lines")?.setData({type:"FeatureCollection",features:lines});
+  map.getSource("subway-station-connections")?.setData({type:"FeatureCollection",features:mapStationConnections(map,stations)});
+  map.getSource("subway-station-labels")?.setData({type:"FeatureCollection",features:stationFeatures(mapStationLabels(stations))});
   map.getSource("subway-stations")?.setData({type:"FeatureCollection",features:stationFeatures(stations)});
   map.getSource("subway-vehicles")?.setData({type:"FeatureCollection",features:vehicleFeatures(map,vehicles)});
 }

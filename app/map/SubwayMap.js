@@ -6,11 +6,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppTabs from "../components/AppTabs";
 import RouteBullet from "../components/RouteBullet";
+import { useMapTheme } from "../lib/themePreference";
 import { useSubwayPreferences } from "../lib/preferences";
 import {
   createSubwayMap,
   selectSubwayMapStation,
   updateSubwayMapData,
+  updateSubwayMapTheme,
 } from "../lib/subwayMapClient";
 
 function stationHref(station, routeId) {
@@ -55,10 +57,17 @@ function StationSheet({ station, onClose }) {
 export default function SubwayMap({ lines, stations, vehicles = [] }) {
   const { mapEnabled } = useSubwayPreferences();
   const router = useRouter();
+  const theme = useMapTheme();
   const mapContainer = useRef(null);
   const mapInstance = useRef(null);
   const latestMapData = useRef({ lines, stations, vehicles });
   const [mapReady, setMapReady] = useState(false);
+  const themeRef = useRef(theme);
+
+  useEffect(() => {
+    themeRef.current = theme;
+    if (mapInstance.current) updateSubwayMapTheme(mapInstance.current, theme);
+  }, [theme, mapReady]);
   const [mapError, setMapError] = useState("");
   const [selectedStationId, setSelectedStationId] = useState(null);
   const stationsById = useMemo(
@@ -84,6 +93,7 @@ export default function SubwayMap({ lines, stations, vehicles = [] }) {
           center: [-73.94, 40.72],
           zoom: 10.3,
           lineCasing: false,
+          theme: themeRef.current,
           lines: initialData.lines,
           showStationLabels: true,
           stations: initialData.stations,

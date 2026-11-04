@@ -1,6 +1,6 @@
 import { ROUTE_COLORS, routeFamily } from "../routes.js";
 import { stationActiveRouteIds, stationRouteIds } from "../stationDiscovery.js";
-import { activeServiceIds } from "./helpers.js";
+import { activeServiceIds, tripHasDeparted } from "./helpers.js";
 import { getRealtime, getStatic } from "./feeds.js";
 import { getStations } from "./stations.js";
 import { stationStopId } from "./stopIds.js";
@@ -242,7 +242,8 @@ export function buildRealtimeStationVehicles(
   entities,
   stopsById,
   displayedRouteIds,
-  now = Math.floor(Date.now() / 1000)
+  now = Math.floor(Date.now() / 1000),
+  data
 ) {
   const displayedRouteSet = new Set(displayedRouteIds.map(routeFamily));
   const reportedPositions = new Map(entities.flatMap((entity) => {
@@ -255,7 +256,7 @@ export function buildRealtimeStationVehicles(
   for (const entity of entities) {
     const update = entity.tripUpdate;
     const routeId = routeFamily(update?.trip?.routeId);
-    if (!update || !displayedRouteSet.has(routeId)) continue;
+    if (!update || !displayedRouteSet.has(routeId) || !tripHasDeparted(update, data, now)) continue;
     const timedStops = (update.stopTimeUpdate || []).flatMap((item) => {
       const coordinate = realtimeStopCoordinate(item.stopId, stopsById);
       const timestamp = stopUpdateTime(item);
@@ -416,7 +417,7 @@ export async function getStationMapData(stopId) {
     properties: { ...line.properties, offset: (index - middle) * 8 },
   }));
   const vehicles = snapVehiclesToLines(
-    buildRealtimeStationVehicles(entities, data.stopsById, displayedRouteIds),
+    buildRealtimeStationVehicles(entities, data.stopsById, displayedRouteIds, undefined, data),
     lines
   );
 
@@ -445,7 +446,7 @@ export async function getSubwayMapData() {
     return activeRoutes.length ? activeRoutes : stationRouteIds(station);
   }))];
   const vehicles = snapVehiclesToLines(
-    buildRealtimeStationVehicles(entities, data.stopsById, displayedRouteIds),
+    buildRealtimeStationVehicles(entities, data.stopsById, displayedRouteIds, undefined, data),
     lines
   );
 

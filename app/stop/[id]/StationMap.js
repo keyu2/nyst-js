@@ -2,16 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMapTheme } from "../../lib/themePreference";
 import { useSubwayPreferences } from "../../lib/preferences";
-import { createSubwayMap, updateSubwayMapData } from "../../lib/subwayMapClient";
+import { createSubwayMap, updateSubwayMapData, updateSubwayMapTheme } from "../../lib/subwayMapClient";
 
 export default function StationMap({ lines, station, vehicles = [] }) {
   const { mapEnabled, stationView } = useSubwayPreferences();
   const router = useRouter();
+  const theme = useMapTheme();
   const mapContainer = useRef(null);
   const mapInstance = useRef(null);
   const latestMapData = useRef({ lines, station, vehicles });
   const [mapReady, setMapReady] = useState(false);
+  const themeRef = useRef(theme);
+
+  useEffect(() => {
+    themeRef.current = theme;
+    if (mapInstance.current) updateSubwayMapTheme(mapInstance.current, theme);
+  }, [theme, mapReady]);
   const [mapError, setMapError] = useState(false);
 
   useEffect(() => {
@@ -33,6 +41,7 @@ export default function StationMap({ lines, station, vehicles = [] }) {
           container: mapContainer.current,
           controls: false,
           lineCasing: false,
+          theme: themeRef.current,
           lines: initialData.lines,
           onVehicleSelect: ({ id, routeId }) => {
             router.push(

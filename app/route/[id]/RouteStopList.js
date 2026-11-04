@@ -95,6 +95,8 @@ export function RouteStopList({
           noService || visibleStops[index - 1]?.hasService === false;
         const nextInactive =
           noService || visibleStops[index + 1]?.hasService === false;
+        const trackAbove = !noService && (stop.trackServiceAbove ?? (!inactive && !previousInactive));
+        const trackBelow = !noService && (stop.trackServiceBelow ?? (!inactive && !nextInactive));
         const boundary = searching
           ? null
           : boroughBoundary(visibleStops[index - 1], stop);
@@ -119,7 +121,7 @@ export function RouteStopList({
               <div
                 aria-label={`Borough boundary between ${boundary[0]} and ${boundary[1]}`}
                 className="borough-boundary"
-                style={{ "--strip-color": stripColor }}
+                style={{ "--strip-color": trackAbove ? stripColor : inactiveColor }}
               >
                 <span aria-hidden="true" className="borough-boundary-line" />
                 <span className="borough-direction-label">
@@ -140,8 +142,8 @@ export function RouteStopList({
             >
               <StripMarker
                 color={inactive ? inactiveColor : stripColor}
-                aboveColor={inactive || previousInactive ? inactiveColor : stripColor}
-                belowColor={inactive || nextInactive ? inactiveColor : stripColor}
+                aboveColor={trackAbove ? stripColor : inactiveColor}
+                belowColor={trackBelow ? stripColor : inactiveColor}
                 connectsAbove={index > 0 || (continuesAbove && !searching)}
                 connectsBelow={
                   index < visibleStops.length - 1 ||
